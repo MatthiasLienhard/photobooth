@@ -1,56 +1,29 @@
-#!/usr/bin/env python
-# Created by br _at_ re-web _dot_ eu, 2015-2016
+#!/usr/bin/env python3
 
+
+import math
 import os
 from datetime import datetime
 from glob import glob
 from sys import exit
-from time import sleep, clock
-
+from time import sleep, time
 from PIL import Image
-
-from gui import GUI_PyGame as GuiModule
 # from camera import CameraException, Camera_cv as CameraModule
-from camera import CameraException, Camera_gPhoto as CameraModule
-from slideshow import Slideshow
+# from camera import CameraException, Camera_gPhoto as CameraModule
+import camera
+from events import GPIO_LAMP
+from layouts import Layout
+from filter import *
 from events import Rpi_GPIO as GPIO
-
+from gui import GUI_PyGame as GuiModule
+from slideshow import Slideshow
+import gui
+import numpy as np
+import random
+import scipy.ndimage
 #####################
 ### Configuration ###
 #####################
-
-# Screen size
-display_size = (1024, 600)
-
-# Maximum size of assembled image
-image_size = (2352, 1568)
-
-# Size of pictures in the assembled image
-thumb_size = (1176, 784)
-
-# Image basename
-picture_basename = datetime.now().strftime("%Y-%m-%d/pic")
-
-# GPIO channel of switch to shutdown the Photobooth
-gpio_shutdown_channel = 24 # pin 18 in all Raspi-Versions
-
-# GPIO channel of switch to take pictures
-gpio_trigger_channel = 23 # pin 16 in all Raspi-Versions
-
-# GPIO output channel for (blinking) lamp
-gpio_lamp_channel = 4 # pin 7 in all Raspi-Versions
-
-# Waiting time in seconds for posing
-pose_time = 3
-
-# Display time for assembled picture
-display_time = 10
-
-# Show a slideshow of existing pictures when idle
-idle_slideshow = True
-
-# Display time of pictures in the slideshow
-slideshow_display_time = 5
 
 ###############
 ### Classes ###
@@ -69,18 +42,21 @@ class PictureList:
         """
 
         # Set basename and suffix
-        self.basename = basename
         self.suffix = ".jpg"
         self.count_width = 5
 
         # Ensure directory exists
-        dirname = os.path.dirname(self.basename)
-        if not os.path.exists(dirname):
-            os.makedirs(dirname)
+        self.dirname, self.basename = os.path.split(basename)
+        if not os.path.exists(self.dirname):
+            os.makedirs(self.dirname)
+        if not os.path.exists(self.dirname+"/raw"):
+            os.makedirs(self.dirname+"/raw")
 
         # Find existing files
         count_pattern = "[0-9]" * self.count_width
-        pictures = glob(self.basename + count_pattern + self.suffix)
+        pictures = glob(self.dirname+"/"+self.basename + count_pattern + self.suffix)
+
+
 
         # Get number of latest file
         if len(pictures) == 0:
@@ -92,10 +68,14 @@ class PictureList:
 
         # Print initial infos
         print("Info: Number of last existing file: " + str(self.counter))
-        print("Info: Saving assembled pictures as: " + self.basename + "XXXXX.jpg")
+        print("Info: Saving assembled pictures as: " + self.dirname +"/" + self.basename + "XXXXX.jpg")
 
     def get(self, count):
-        return self.basename + str(count).zfill(self.count_width) + self.suffix
+        return self.dirname+"/" + self.basename + str(count).zfill(self.count_width) + self.suffix
+
+    def get_raw(self, count,n):
+        stem=self.dirname+"/raw/"+self.basename + str(count).zfill(self.count_width)
+        return [stem+'_'+str(i) + self.suffix for i in range(n)]
 
     def get_last(self):
         return self.get(self.counter)
@@ -105,68 +85,50 @@ class PictureList:
         return self.get(self.counter)
 
 
+
 class Photobooth:
     """The main class.
 
     It contains all the logic for the photobooth.
     """
 
-    def __init__(self, display_size, picture_basename, picture_size, pose_time, display_time,
-                 trigger_channel, shutdown_channel, lamp_channel, idle_slideshow, slideshow_display_time):
-        self.display      = GuiModule('Photobooth', display_size)
-        self.pictures     = PictureList(picture_basename)
-        self.camera       = CameraModule(picture_size)
+    def __init__(self, display_size, picture_basename, picture_size, preview_size,  pose_time, display_time, slideshow_display_time):
+        self.start_info_timer=5
+        self.screensaver_timer=5
+        self.slideshow_timer=slideshow_display_time
+        self.display=None
+        self.display_size=display_size
+        #self.init_display()
 
-        self.pic_size     = picture_size
+        self.pictures     = PictureList(picture_basename)
+        self.picture_dir  = os.path.realpath(self.pictures.dirname)
+        self.picture_size = picture_size
         self.pose_time    = pose_time
         self.display_time = display_time
 
-        self.trigger_channel  = trigger_channel
-        self.shutdown_channel = shutdown_channel
-        self.lamp_channel     = lamp_channel
+        self.layout = Layout(1, self.picture_size)
+        self.filter=HighContrastMonochrome()
 
-        self.idle_slideshow = idle_slideshow
-        if self.idle_slideshow:
-            self.slideshow_display_time = slideshow_display_time
-            self.slideshow = Slideshow(display_size, display_time, 
-                                       os.path.dirname(os.path.realpath(picture_basename)))
+        self.current_page=None
+        try:
+            self.camera = camera.Camera_gPhoto(picture_size, preview_size)
+        except camera.CameraException as e:
+            print(e)
+            try:
+                self.camera = camera.Camera_pi(picture_size, preview_size)
+            except camera.CameraException as e:
+                print(e)
+                try:
+                    self.camera = camera.Camera_cv(picture_size, preview_size)
+                except camera.CameraException as e:
+                    print(e)
+                    self.camera = camera.Camera(picture_size, preview_size)
 
-        input_channels    = [ trigger_channel, shutdown_channel ]
-        output_channels   = [ lamp_channel ]
-        self.gpio         = GPIO(self.handle_gpio, input_channels, output_channels)
+    def run(self, fullscreen=True):
+        self.display = GuiModule('Photobooth', self.display_size, fullscreen=fullscreen)
+        self.current_page = StartPage(self)
 
-    def teardown(self):
-        self.display.clear()
-        self.display.show_message("Shutting down...")
-        self.display.apply()
-        self.gpio.set_output(self.lamp_channel, 0)
-        sleep(0.5)
-        self.display.teardown()
-        self.gpio.teardown()
-        exit(0)
-
-    def _run_plain(self):
-        while True:
-            self.camera.set_idle()
-
-            # Display default message
-            self.display.clear()
-            self.display.show_message("Hit the button!")
-            self.display.apply()
-
-            # Wait for an event and handle it
-            event = self.display.wait_for_event()
-            self.handle_event(event)
-
-    def _run_slideshow(self):
-        while True:
-            self.camera.set_idle()
-            self.slideshow.display_next("Hit the button!")
-            tic = clock()
-            while clock() - tic < self.slideshow_display_time:
-                self.check_and_handle_events()
-
-    def run(self):
+        self.init_display()
         while True:
             try:
                 # Enable lamp
@@ -179,7 +141,7 @@ class Photobooth:
                     self._run_plain()
 
             # Catch exceptions and display message
-            except CameraException as e:
+            except camera.CameraException as e:
                 self.handle_exception(e.message)
             # Do not catch KeyboardInterrupt and SystemExit
             except (KeyboardInterrupt, SystemExit):
@@ -187,226 +149,242 @@ class Photobooth:
             except Exception as e:
                 print('SERIOUS ERROR: ' + repr(e))
                 self.handle_exception("SERIOUS ERROR!")
+                self.teardown()
 
-    def check_and_handle_events(self):
-        r, e = self.display.check_for_event()
-        while r:
+    def teardown(self):
+        self.display.clear()
+        self.display.show_message("Shutting down...")
+        self.display.apply()
+        self.display.gpio.set_output(self.lamp_channel, 0)
+        sleep(0.5)
+        self.display.teardown()
+        self.display.gpio.teardown()
+        exit(0)
+
+    def show_slideshow(self):
+        self.current_page=SlideshowPage(self)
+    def show_main(self):
+        self.current_page=MainPage(self)
+    def show_shooting(self):
+        self.current_page=ShootingPage(self)
+    def show_pictopt(self):
+        self.current_page=PictOptPage(self)
+    def show_layoutopt(self):
+        self.current_page=LayoutOptPage(self)
+    def show_result(self):
+        self.current_page=ResultPage(self)
+
+    def get_info_text(self):
+        # todo: make infotext
+        return("Infotext")
+
+#####################
+### Display Pages ###
+#####################
+
+class DisplayPage:
+    def __init__(self,name, display, options=[], timer=5, bg=None, overlay_text = None ):
+        self.name=name
+        self.display=display
+        if len(options)==0 :
+            options=[self.teardown]
+        self.options=options #0:timer 1:middle 2:left 3: right, 4: long middle 5: long left 6: long right
+        self.timer=timer
+        self.overlay_text=overlay_text
+        self.bg=bg
+    def apply(self):
+        self.display.clear()
+        if self.bg is not None:
+            self.display.show_picture(self.bg, self.display.get_size())
+        if self.overlay_text is not None:
+            self.display.show_message(self.overlay_text)
+        self.display.apply()
+
+    def start(self):
+        self.apply()
+        self.run()
+
+    def run(self):
+        while True:
+            e = self.display.wait_for_event(self.timer)
             self.handle_event(e)
-            r, e = self.display.check_for_event()
 
-    def handle_gpio(self, channel):
-        if channel in [ self.trigger_channel, self.shutdown_channel ]:
-            self.display.trigger_event(channel)
-
-    def handle_event(self, event):
-        if event.type == 0:
-            self.teardown()
-        elif event.type == 1:
-            self.handle_keypress(event.value)
-        elif event.type == 2:
-            self.handle_mousebutton(event.value[0], event.value[1])
-        elif event.type == 3:
-            self.handle_gpio_event(event.value)
-
-    def handle_keypress(self, key):
-        """Implements the actions for the different keypress events"""
-        # Exit the application
-        if key == ord('q'):
-            self.teardown()
-        # Take pictures
-        elif key == ord('c'):
-            self.take_picture()
-
-    def handle_mousebutton(self, key, pos):
-        """Implements the actions for the different mousebutton events"""
-        # Take a picture
-        if key == 1:
-            self.take_picture()
-
-    def handle_gpio_event(self, channel):
-        """Implements the actions taken for a GPIO event"""
-        if channel == self.trigger_channel:
-            self.take_picture()
-        elif channel == self.shutdown_channel:
+    def handle_event(self,event):
+        action = event.get_action()
+        print(self.name + " handles "+str(event) +"--> action "+str(action))
+        if action is not None and len(self.options) > action:
+            if self.options[action] is not None:
+                self.options[action]()
+        if event.get_type() is 'quit':
             self.teardown()
 
-    def handle_exception(self, msg):
-        """Displays an error message and returns"""
+    def teardown(self):
         self.display.clear()
-        print("Error: " + msg)
-        self.display.show_message("ERROR:\n\n" + msg)
+        self.display.show_message("Shutting down...")
         self.display.apply()
-        sleep(3)
+        self.display.gpio.set_output(GPIO_LAMP, 0)
+        sleep(0.5)
+        self.display.teardown()
 
+        exit(0)
 
-    def assemble_pictures(self, input_filenames):
-        """Assembles four pictures into a 2x2 grid
+class StartPage(DisplayPage):
+    def __init__(self, pb):
+        options=[pb.show_slideshow, pb.show_slideshow ]
+        DisplayPage.__init__(self, "Start", pb.display,options,pb.start_info_timer)
+        self.overlay_text=pb.get_info_text()
+        self.start()
 
-        It assumes, all original pictures have the same aspect ratio as
-        the resulting image.
+class SlideshowPage(DisplayPage):
+    def __init__(self, pb, photo_idx=None,overlay="<Press the Button>"):
+        DisplayPage.__init__(self, "Slideshow", pb.display)
 
-        For the thumbnail sizes we have:
-        h = (H - 2 * a - 2 * b) / 2
-        w = (W - 2 * a - 2 * b) / 2
+        self.timer=pb.slideshow_timer
+        self.options=[ self.jump_image_random,pb.show_main, self.jump_image_rev, self.jump_image_fwd,
+             pb.show_result,  self.jump_image_frev, self.jump_image_ffwd]
+        self.image_list=pb.pictures #list of filenames
+        self.n_img=self.image_list.counter
+        if photo_idx is None:
+            photo_idx=self.n_img
 
-                                    W
-               |---------------------------------------|
-
-          ---  +---+-------------+---+-------------+---+  ---
-           |   |                                       |   |  a
-           |   |   +-------------+   +-------------+   |  ---
-           |   |   |             |   |             |   |   |
-           |   |   |      0      |   |      1      |   |   |  h
-           |   |   |             |   |             |   |   |
-           |   |   +-------------+   +-------------+   |  ---
-         H |   |                                       |   |  2*b
-           |   |   +-------------+   +-------------+   |  ---
-           |   |   |             |   |             |   |   |
-           |   |   |      2      |   |      3      |   |   |  h
-           |   |   |             |   |             |   |   |
-           |   |   +-------------+   +-------------+   |  ---
-           |   |                                       |   |  a
-          ---  +---+-------------+---+-------------+---+  ---
-
-               |---|-------------|---|-------------|---|
-                 a        w       2*b       w        a
-        """
-
-        # Thumbnail size of pictures
-        outer_border = 50
-        inner_border = 20
-        thumb_box = ( int( self.pic_size[0] / 2 ) ,
-                      int( self.pic_size[1] / 2 ) )
-        thumb_size = ( thumb_box[0] - outer_border - inner_border ,
-                       thumb_box[1] - outer_border - inner_border )
-
-        # Create output image with white background
-        output_image = Image.new('RGB', self.pic_size, (255, 255, 255))
-
-        # Image 0
-        img = Image.open(input_filenames[0])
-        img.thumbnail(thumb_size)
-        offset = ( thumb_box[0] - inner_border - img.size[0] ,
-                   thumb_box[1] - inner_border - img.size[1] )
-        output_image.paste(img, offset)
-
-        # Image 1
-        img = Image.open(input_filenames[1])
-        img.thumbnail(thumb_size)
-        offset = ( thumb_box[0] + inner_border,
-                   thumb_box[1] - inner_border - img.size[1] )
-        output_image.paste(img, offset)
-
-        # Image 2
-        img = Image.open(input_filenames[2])
-        img.thumbnail(thumb_size)
-        offset = ( thumb_box[0] - inner_border - img.size[0] ,
-                   thumb_box[1] + inner_border )
-        output_image.paste(img, offset)
-
-        # Image 3
-        img = Image.open(input_filenames[3])
-        img.thumbnail(thumb_size)
-        offset = ( thumb_box[0] + inner_border ,
-                   thumb_box[1] + inner_border )
-        output_image.paste(img, offset)
-
-        # Save assembled image
-        output_filename = self.pictures.get_next()
-        output_image.save(output_filename, "JPEG")
-        return output_filename
-
-    def show_counter(self, seconds):
-        if self.camera.has_preview():
-            tic = clock()
-            toc = clock() - tic
-            while toc < seconds:
-                self.display.clear()
-                self.camera.take_preview("/tmp/photobooth_preview.jpg")
-                self.display.show_picture("/tmp/photobooth_preview.jpg", flip=True) 
-                self.display.show_message(str(seconds - int(toc)))
-                self.display.apply()
-
-                # Limit progress to 1 "second" per preview (e.g., too slow on Raspi 1)
-                toc = min(toc + 1, clock() - tic)
+        self.photo_idx=photo_idx
+        self.bigjump=10
+        self.overlay_text=overlay
+        if photo_idx > 0 and photo_idx <= self.n_img:
+            self.bg = self.image_list.get(self.photo_idx)
         else:
-            for i in range(seconds):
-                self.display.clear()
-                self.display.show_message(str(seconds - i))
+            print("No Photos - skipping slideshow")
+            pb.show_main()
+        self.start()
+
+    def jump_image_random(self):
+        old_idx=self.photo_idx
+        while self.photo_idx is old_idx:
+            self.photo_idx=random.randrange(1,self.n_img+1)
+            self.bg = self.image_list.get(self.photo_idx)
+            self.apply()
+    def jump_image_frev(self):
+        self.jump_image(-self.bigjump)
+    def jump_image_rev(self):
+        self.jump_image(-1)
+    def jump_image_fwd(self):
+        self.jump_image(1)
+    def jump_image_ffwd(self):
+        self.jump_image(self.bigjump)
+    def jump_image(self, jump):
+        if self.photo_idx==1 and jump < 0:
+            self.photo_idx=self.n_img
+        elif self.photo_idx + jump < 0:
+            self.photo_idx=1
+        elif self.photo_idx==self.n_img and jump > 0:
+            self.photo_idx=1
+        elif self.photo_idx + jump > self.n_img:
+            self.photo_idx=self.n_img
+        else:
+            self.photo_idx += jump
+        self.bg = self.image_list.get(self.photo_idx)
+
+        self.apply()
+
+class MainPage(DisplayPage):
+    def __init__(self, pb):
+        DisplayPage.__init__(self, "Main", pb.display)
+        self.timer=pb.screensaver_timer
+        self.options=[pb.show_slideshow,pb.show_shooting, pb.show_pictopt, pb.show_layoutopt,
+             pb.teardown] #todo: add advanced opt
+        self.bg=self.get_bg()
+        self.overlay_text="Main Menue"
+        self.start()
+
+    def get_bg(self):
+        #todo load background and scale to resolution
+        return(None )
+
+
+class ShootingPage(DisplayPage):
+    def __init__(self, pb:Photobooth):
+        DisplayPage.__init__(self, "Shooting", pb.display, timer=2)
+        #pb.cam.start_preview()
+        #self.bg=pb.get_preview_frame()
+        self.posing_timer=pb.pose_time
+        self.options=[self.take_pictures]
+        self.n_pictures=pb.layout.n_picture
+        self.overlay_text ="Taking {} photos!".format(self.n_pictures)
+        self.cam=pb.camera
+        self.cam.start_preview_stream()
+        #self.bg=self.cam.get_preview_frame()
+        pic_list=pb.pictures
+        self.result_filename=pic_list.get_next()
+        self.raw_filenames=pic_list.get_raw(pic_list.counter, self.n_pictures)
+        self.layout=pb.layout
+        self.filter=pb.filter
+        self.start()
+        self.layout.assemble_pictures(self.raw_filenames, self.result_filename, filter=self.filter)
+        pb.show_result()
+
+    def run(self):
+        e = self.display.wait_for_event(self.timer)
+        self.handle_event(e)
+
+    def take_pictures(self):
+
+        for i in range(self.n_pictures):
+            print("taking picture "+str(i))
+            t0=time()
+            countdown=self.posing_timer
+            while countdown > 0:
+                countdown = self.posing_timer - time() + t0
+                self.overlay_text=str(math.ceil(countdown))
+                self.display.show_picture(self.cam.get_preview_frame(filter=self.filter), flip=True)
+                self.display.show_message(self.overlay_text)
                 self.display.apply()
-                sleep(1)
+                r , event = self.display.check_for_event()
+                if r:
+                    self.handle_event(event) #no events defined but anyway
+            self.display.clear()
+            self.display.show_message("smile ;-)")
+            self.display.apply()
+            self.cam.take_picture(self.raw_filenames[i])
 
-    def take_picture(self):
-        """Implements the picture taking routine"""
-        # Disable lamp
-        self.gpio.set_output(self.lamp_channel, 0)
+class PictOptPage(DisplayPage):
+    def __init__(self, pb):
+        timer=pb.screensaver_timer
+        opt=[pb.show_slideshow,pb.show_main(), pb.toggle_pic_orientation, pb.toggle_pic_filter]
+        bg=self.get_bg()
+        DisplayPage.__init__(self, "Picture Options", pb.display,  options=opt, timer=timer, bg=bg)
 
-        # Show pose message
-        self.display.clear()
-        self.display.show_message("POSE!\n\nTaking four pictures...");
-        self.display.apply()
-        sleep(2)
+    def get_bg(self):
+        #todo load background
+        return None
 
-        # Extract display and image sizes
-        size = self.display.get_size()
-        outsize = (int(size[0]/2), int(size[1]/2))
+class LayoutOptPage(DisplayPage):
+    def __init__(self, pb):
+        timer=pb.screensaver_timer
+        opt=[pb.show_slideshow,pb.set_layout_two, pb.set_layout_one, pb.set_layout_three]
+        bg=self.get_bg()
+        DisplayPage.__init__(self, "Layout Options", pb.display,  options=opt, timer=timer, bg=bg)
 
-        # Take pictures
-        filenames = [i for i in range(4)]
-        for x in range(4):
-            # Countdown
-            self.show_counter(self.pose_time)
+    def get_bg(self):
+        #todo load background from file
+        return None
 
-            # Try each picture up to 3 times
-            remaining_attempts = 3
-            while remaining_attempts > 0:
-                remaining_attempts = remaining_attempts - 1
+class ResultPage(DisplayPage):
+    def __init__(self, pb, photo_idx=None):
+        timer= pb.screensaver_timer
+        opt=[  pb.show_slideshow,pb.show_main, self.delete_pic, self.print_pic ]
+        if photo_idx is None:
+            self.file_name=pb.pictures.get_last()
+        else:
+            self.file_name=pb.pictures.get(photo_idx)
+        img=self.file_name
 
-                self.display.clear()
-                self.display.show_message("S M I L E !!!\n\n" + str(x+1) + " of 4")
-                self.display.apply()
+        DisplayPage.__init__(self, "Results", pb.display, options=opt, timer=timer, bg=img)
 
-                tic = clock()
+    def delete_pic(self):
+        pass
 
-                try:
-                    filenames[x] = self.camera.take_picture("/tmp/photobooth_%02d.jpg" % x)
-                    remaining_attempts = 0
-                except CameraException as e:
-                    # On recoverable errors: display message and retry
-                    if e.recoverable:
-                        if remaining_attempts > 0:
-                            self.display.clear()
-                            self.display.show_message(e.message)  
-                            self.display.apply()
-                            sleep(5)
-                        else:
-                            raise CameraException("Giving up! Please start over!", False)
-                    else:
-                       raise e
-
-                # Measure used time and sleep a second if too fast 
-                toc = clock() - tic
-                if toc < 1.0:
-                    sleep(1.0 - toc)
-
-        # Show 'Wait'
-        self.display.clear()
-        self.display.show_message("Please wait!\n\nProcessing...")
-        self.display.apply()
-
-        # Assemble them
-        outfile = self.assemble_pictures(filenames)
-
-        # Show pictures for 10 seconds
-        self.display.clear()
-        self.display.show_picture(outfile, size, (0,0))
-        self.display.apply()
-        sleep(self.display_time)
-
-        # Reenable lamp
-        self.gpio.set_output(self.lamp_channel, 1)
-
-
+    def print_pic(self):
+        pass
 
 
 #################
@@ -414,10 +392,32 @@ class Photobooth:
 #################
 
 def main():
-    photobooth = Photobooth(display_size, picture_basename, image_size, pose_time, display_time, 
-                            gpio_trigger_channel, gpio_shutdown_channel, gpio_lamp_channel, 
-                            idle_slideshow, slideshow_display_time)
-    photobooth.run()
+    # Screen size
+    display_size = (1024, 600)
+
+    # Maximum size of assembled image
+    image_size = (2352, 1568)
+
+    preview_size = display_size
+
+    # Image basename
+    picture_basename = datetime.now().strftime("%Y-%m-%d/photobooth_%Y-%m-%d_")
+
+    # Waiting time in seconds for posing
+    pose_time = 3
+
+    # Display time for assembled picture
+    display_time = 10
+
+    # Show a slideshow of existing pictures when idle
+    idle_slideshow = True
+
+    # Display time of pictures in the slideshow
+    slideshow_display_time = 5
+
+    photobooth = Photobooth(display_size, picture_basename, image_size, preview_size, pose_time, display_time,
+                             slideshow_display_time)
+    photobooth.run(fullscreen=False)
     photobooth.teardown()
     return 0
 

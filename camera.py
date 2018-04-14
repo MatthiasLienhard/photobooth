@@ -3,33 +3,27 @@
 
 import subprocess
 
-cv_enabled = False
-gphoto2cffi_enabled = False
-piggyphoto_enabled = False
-
-try:
-    import cv2 as cv
-    cv_enabled = True
-    print('OpenCV available')
-except ImportError:
-    pass
+from PIL import Image, ImageDraw
+import io
+import cv2
+import warnings
+import filter
 
 try:
     import gphoto2cffi as gp
-    gpExcept = gp.errors.GPhoto2Error
-    gphoto2cffi_enabled = True
-    print('Gphoto2cffi available')
+    import gphoto2cffi.errors as gpErrors
+    gphoto_enabled = True
 except ImportError:
-    pass
+    gphoto_enabled=False
+    warnings.warn("gphoto module not installed. To use DSLR/digicams install gphoto2cffi module.")
 
-if not gphoto2cffi_enabled:
-    try:
-        import piggyphoto as gp
-        gpExcept = gp.libgphoto2error
-        piggyphoto_enabled = True
-        print('Piggyphoto available')
-    except ImportError:
-        pass
+
+try:
+    import picamera
+    picam_enabled=True
+except ImportError:
+    picam_enabled=False
+    warnings.warn("raspberry pi module not installed. To use PiCam install picamera module.")
 
 class CameraException(Exception):
     """Custom exception class to handle camera class errors"""
@@ -37,97 +31,172 @@ class CameraException(Exception):
         self.message = message
         self.recoverable = recoverable
 
+class Camera:
+    def __init__(self, picture_size,preview_size, focal_length=30):
+        self.picture_size = picture_size
+        self.focal_length = focal_length
+        self.preview_size=preview_size
+    def get_test_image(self, size):
+        img = Image.new('RGB', size, color=(73, 109, 137))
+        d = ImageDraw.Draw(img)
+        d.text((10, 10), "Testimage", fill=(255, 255, 0))
+        return(img)
 
-class Camera_cv:
-    def __init__(self, picture_size):
-        if cv_enabled:
-            self.cap = cv.VideoCapture(0)
-            self.cap.set(3, picture_size[0])
-            self.cap.set(4, picture_size[1])
-
-    def has_preview(self):
-        return True 
-
-    def take_preview(self, filename="/tmp/preview.jpg"):
-        self.take_picture(filename)
-
-    def take_picture(self, filename="/tmp/picture.jpg"):
-        if cv_enabled:
-            r, frame = self.cap.read()
-            cv.imwrite(filename, frame)
-            return filename
+    def get_preview_frame(self, filename=None):
+        img=self.get_test_image(self.preview_size)
+        if filename is not None:
+            img.save(filename)
         else:
-            raise CameraException("OpenCV not available!")
+            return img
+    def take_picture(self, filename="/tmp/picture.jpg"):
+        img=self.get_test_image(self.picture_size)
+        if filename is not None:
+            img.save(filename)
+        else:
+            return img
 
     def set_idle(self):
         pass
+    def start_preview_stream(self):
+        pass
+    def stop_preview_stream(self):
+        pass
+    def focus(self):
+        pass
+    def get_zoom(self):
+        return self.focal_length
+
+    def set_zoom(self, focal_length):
+        self.focal_length=focal_length
+        return self.focal_length
 
 
-class Camera_gPhoto:
+
+
+class Camera_cv(Camera):
+    def __init__(self, picture_size, preview_size, zoom=30):
+        Camera.__init__(self,picture_size, preview_size, zoom)
+        self.cam = cv2.VideoCapture(0)
+        if not self.cam.isOpened():
+            raise CameraException("No webcam found!")
+        fps=10
+
+        self.cam.set(3, picture_size[0])
+        self.cam.set(4, picture_size[1])
+        self.cam.set(4, fps)
+
+    def get_preview_frame(self, filename=None, filter=None):
+        return(self._take_picture(filename, filter, size=self.preview_size))
+
+    def take_picture(self, filename="/tmp/picture.jpg", filter=None):
+        return (self._take_picture(filename, filter, size=self.picture_size))
+
+    def _take_picture(self, filename, filter, size):
+        print(size)
+        frame = cv2.resize( self.cam.read()[1], size)
+        if filename is not None and filter is None:
+            cv2.imwrite(filename, frame)
+        else:
+            frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
+            img = Image.fromarray(frame)
+            if filter is not None:
+                img=filter.apply(img)
+            return(img)
+
+class Camera_pi(Camera):
+
+    def __init__(self, picture_size,preview_size, zoom =30):
+        Camera.__init__(self,picture_size, preview_size, zoom)
+        if not picam_enabled:
+            raise CameraException("No PiCam module")
+        try:
+            self.cam = picamera.PiCamera( framerate=10)
+            self.cam.rotation = 0
+            self.cam.start_preview(alpha=0) # invisible preview
+        except picamera.PiCameraError:
+            raise CameraException("Cannot initialize PiCam")
+        self.preview_stream=None
+
+    def start_preview_stream(self):
+        self.preview_stream = picamera.PiCameraCircularIO(self.cam, seconds=1) # 17 MB
+        self.cam.start_recording(self.preview_stream, format='mjpeg',resize=self.preview_size)
+
+    def stop_preview_stream(self):
+        self.cam.stop_recording()
+
+
+    def get_preview_frame(self, filename=None, filter=None):
+        img= Image.open(io.BytesIO(self.preview_stream.read1()))
+        if filter is not None:
+            img = filter.apply(img)
+        if filename is None:
+            return(img)
+        else:
+            img.save(filename)
+
+    def take_picture(self, filename=None, filter=None):
+        stream = io.BytesIO()
+        self.cam.capture(stream, format='jpeg', resize=self.picture_size)
+        img=Image.open(stream)
+        if filter is not None:
+            img = filter.apply(img)
+        if filename is None:
+            return(img)
+        else:
+            img.save(filename)
+        # self.cam.capture(filename)
+
+
+
+class Camera_gPhoto(Camera):
     """Camera class providing functionality to take pictures using gPhoto 2"""
 
-    def __init__(self, picture_size):
-        self.picture_size = picture_size
+    def __init__(self, picture_size, preview_size, zoom=30):
+        Camera.__init__(self,picture_size, preview_size, zoom)
         # Print the capabilities of the connected camera
         try:
-            if gphoto2cffi_enabled:
-                self.cap = gp.Camera()
-            elif piggyphoto_enabled:
-                self.cap = gp.camera()
-                print(self.cap.abilities)
-            else:
-                print(self.call_gphoto("-a", "/dev/null"))
-        except CameraException as e:
-            print('Warning: Listing camera capabilities failed (' + e.message + ')')
-        except gpExcept as e:
-            print('Warning: Listing camera capabilities failed (' + e.message + ')')
+            self.cam = gp.Camera()
+        except gpErrors.UnsupportedDevice as e:
+            raise CameraException("Can not initialize gphoto camera: "+str(e))
 
-    def call_gphoto(self, action, filename):
-        # Try to run the command
-        try:
-            cmd = "gphoto2 --force-overwrite --quiet " + action + " --filename " + filename
-            output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
-            if "ERROR" in output:
-                raise subprocess.CalledProcessError(returncode=0, cmd=cmd, output=output)
-        except subprocess.CalledProcessError as e:
-            if "EOS Capture failed: 2019" in e.output or "Perhaps no focus" in e.output:
-                raise CameraException("Can't focus!\nMove a little bit!", True)
-            elif "No camera found" in e.output:
-                raise CameraException("No (supported) camera detected!", False)
-            elif "command not found" in e.output:
-                raise CameraException("gPhoto2 not found!", False)
-            else:
-                raise CameraException("Unknown error!\n" + '\n'.join(e.output.split('\n')[1:3]), False)
-        return output
+    def start_preview_stream(self):
+        preview = self.cam.get_preview()
 
-    def has_preview(self):
-        return gphoto2cffi_enabled or piggyphoto_enabled
+    def stop_preview_stream(self):
+        if 'viewfinder' in self.cam._get_config()['actions']:
+            self.cam._get_config()['actions']['viewfinder'].set(False)
 
-    def take_preview(self, filename="/tmp/preview.jpg"):
-        if gphoto2cffi_enabled:
-            self._save_picture(filename, self.cap.get_preview())
-        elif piggyphoto_enabled:
-            self.cap.capture_preview(filename)	
+
+    def get_preview_frame(self, filename=None, filter=None):
+        preview = self.cam.get_preview()
+        if filename is None:
+            return(preview)
         else:
-            raise CameraException("No preview supported!")
+            self._save_picture(filename, preview)
+        # raise CameraException("No preview supported!")
 
-    def take_picture(self, filename="/tmp/picture.jpg"):
-        if gphoto2cffi_enabled:
-            self._save_picture(filename, self.cap.capture())
-        elif piggyphoto_enabled:
-            self.cap.capture_image(filename)
+    def take_picture(self, filename="/tmp/picture.jpg", filter=None):
+        img=self.cam.capture()
+        img=Image.open(img)
+        if filter is not None:
+            img = filter.apply(img)
+        if filename is None:
+            return(img)
         else:
-            self.call_gphoto("--capture-image-and-download", filename)
-        return filename
+            img.save(filename)
 
-    def _save_picture(self, filename, data):
-        f = open(filename, 'wb')
-        f.write(data)
-        f.close()
 
-    def set_idle(self):
-        if gphoto2cffi_enabled:
-            self.cap._get_config()['actions']['viewfinder'].set(False)
-        elif piggyphoto_enabled:
-            # This doesn't work...
-            self.cap.config.main.actions.viewfinder.value = 0
+
+    def press_half(self):
+        if 'eosremoterelease' in self.cam._get_config()['actions']:
+            print("press half")
+            self.cam._get_config()['actions']['eosremoterelease'].set('Press Half')#
+
+    def release_full(self):
+        if 'eosremoterelease' in self.cam._get_config()['actions']:
+            print("release full")
+            self.cam._get_config()['actions']['eosremoterelease'].set('Release Full')#
+
+    def focus(self):
+        pass
+        # todo:define function

@@ -170,7 +170,7 @@ class Camera_gPhoto(Camera):
         if 'viewfinder' in self.cam._get_config()['actions']:
             self.cam._get_config()['actions']['viewfinder'].set(True)
         else:
-            preview = self.cam.get_preview()
+            self.cam.get_preview()
 
     def stop_preview_stream(self):
         if 'viewfinder' in self.cam._get_config()['actions']:
@@ -178,7 +178,8 @@ class Camera_gPhoto(Camera):
 
 
     def get_preview_frame(self, filename=None, filter=None):
-        preview = Image.open(self.cam.get_preview())
+        data=self.cam.get_preview()
+        preview = Image.open(io.BytesIO(data))
         if filename is None:
             return(preview)
         else:

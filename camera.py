@@ -188,7 +188,7 @@ class Camera_gPhoto(Camera):
 
     def take_picture(self, filename="/tmp/picture.jpg", filter=None):
         img=self.cam.capture()
-        img=Image.open(img)
+        img=Image.open(io.BytesIO(img))
         if filter is not None:
             img = filter.apply(img)
         if filename is None:

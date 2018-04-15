@@ -7,6 +7,7 @@ from PIL import Image, ImageDraw
 import io
 import cv2
 import warnings
+from time import sleep
 import filter
 
 try:
@@ -115,17 +116,24 @@ class Camera_pi(Camera):
         except picamera.PiCameraError:
             raise CameraException("Cannot initialize PiCam")
         self.preview_stream=None
+        self.preview_active=False
 
     def start_preview_stream(self):
         self.preview_stream = picamera.PiCameraCircularIO(self.cam, seconds=1) # 17 MB
         self.cam.start_recording(self.preview_stream, format='mjpeg',resize=self.preview_size)
+        self.preview_acitve = True
 
     def stop_preview_stream(self):
         self.cam.stop_recording()
+        self.preview_acitve=False
 
 
     def get_preview_frame(self, filename=None, filter=None):
-        img= Image.open(io.BytesIO(self.preview_stream.read1()))
+        if not self.preview_active:
+            raise CameraException("preview inactive")
+        data = self.preview_stream.read1()
+        data = io.BytesIO(data)
+        img = Image.open(data)
         if filter is not None:
             img = filter.apply(img)
         if filename is None:
@@ -159,7 +167,10 @@ class Camera_gPhoto(Camera):
             raise CameraException("Can not initialize gphoto camera: "+str(e))
 
     def start_preview_stream(self):
-        preview = self.cam.get_preview()
+        if 'viewfinder' in self.cam._get_config()['actions']:
+            self.cam._get_config()['actions']['viewfinder'].set(True)
+        else:
+            preview = self.cam.get_preview()
 
     def stop_preview_stream(self):
         if 'viewfinder' in self.cam._get_config()['actions']:
@@ -167,11 +178,11 @@ class Camera_gPhoto(Camera):
 
 
     def get_preview_frame(self, filename=None, filter=None):
-        preview = self.cam.get_preview()
+        preview = Image.open(self.cam.get_preview())
         if filename is None:
             return(preview)
         else:
-            self._save_picture(filename, preview)
+            preview.save(filename)
         # raise CameraException("No preview supported!")
 
     def take_picture(self, filename="/tmp/picture.jpg", filter=None):

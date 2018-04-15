@@ -332,7 +332,10 @@ class ShootingPage(DisplayPage):
         self.raw_filenames=pic_list.get_raw(pic_list.counter, self.n_pictures)
         self.layout=pb.layout
         self.filter=pb.filter
-        self.start()
+        self.apply()
+        self.cam.start_preview_stream()
+        self.wait_for_event()
+
 
 
 
@@ -355,6 +358,8 @@ class ShootingPage(DisplayPage):
             self.display.show_message("smile ;-)")
             self.display.apply()
             self.cam.take_picture(self.raw_filenames[i])
+
+        self.cam.stop_preview_stream()
         self.layout.assemble_pictures(self.raw_filenames, self.result_filename, filter=self.filter)
 
 

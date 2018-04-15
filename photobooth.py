@@ -204,8 +204,10 @@ class DisplayPage:
         self.wait_for_event()
 
     def wait_for_event(self):
-        e = self.display.wait_for_event(self.timer)
-        self.handle_event(e)
+        while True:
+            e = self.display.wait_for_event(self.timer)
+            if self.handle_event(e):
+                break
 
     def handle_event(self,event):
         action = event.get_action()
@@ -213,8 +215,11 @@ class DisplayPage:
         if action is not None and len(self.options) > action:
             if self.options[action] is not None:
                 self.next_action=self.options[action]
+                return True
         if event.get_type() is 'quit':
             self.teardown()
+        return False
+
 
     def teardown(self):
         self.display.clear()
@@ -260,6 +265,7 @@ class SlideshowPage(DisplayPage):
         self.overlay_text=overlay
         if photo_idx > 0 and photo_idx <= self.n_img:
             self.bg = self.image_list.get(self.photo_idx)
+            self.next_action=self.jump_image_fwd
         else:
             print("No Photos - skipping slideshow")
             self.next_action=pb.show_main
@@ -362,7 +368,7 @@ class ShootingPage(DisplayPage):
 
         self.bg=None
         self.overlay_text="processing..."
-        self.appy()
+        self.apply()
         self.cam.stop_preview_stream()
 
         self.layout.assemble_pictures(self.raw_filenames, self.result_filename, filter=self.filter)

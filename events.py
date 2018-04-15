@@ -58,7 +58,7 @@ class Event:
 class Rpi_GPIO:
     def __init__(self, handle_function):
         if gpio_enabled:
-            input_channels = [GOIO_MAIN , GPIO_LEFT, GPIO_RIGHT ]
+            input_channels = [GPIO_MAIN , GPIO_LEFT, GPIO_RIGHT ]
             output_channels = [GPIO_LAMP]
             # Display initial information
             print("Your Raspberry Pi is board revision " + str(GPIO.RPI_INFO['P1_REVISION']))

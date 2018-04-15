@@ -21,6 +21,10 @@ class Event:
                  3: gpio
                  4: timer
         """
+        if type == 1 and value in (27,113): #ESC, q
+            type=0
+
+
         self.type = type
         self.value = value
 

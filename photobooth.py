@@ -11,12 +11,12 @@ from PIL import Image
 # from camera import CameraException, Camera_cv as CameraModule
 # from camera import CameraException, Camera_gPhoto as CameraModule
 import camera
+from theme import Theme
 from events import GPIO_LAMP
 from layouts import Layout
 from filter import *
 from events import Rpi_GPIO as GPIO
 from gui import GUI_PyGame as GuiModule
-from slideshow import Slideshow
 import gui
 import numpy as np
 import random
@@ -84,6 +84,10 @@ class PictureList:
         self.counter += 1
         return self.get(self.counter)
 
+    def get_info(self):
+        info=("Pictures:\nNumber of existing files: " + str(self.counter))
+        info+=("\nSaving assembled pictures as: " + self.dirname +"/" + self.basename + "XXXXX.jpg")
+        return(info)
 
 
 class Photobooth:
@@ -92,7 +96,7 @@ class Photobooth:
     It contains all the logic for the photobooth.
     """
 
-    def __init__(self, display_size, picture_basename, picture_size, preview_size,  pose_time, display_time, slideshow_display_time):
+    def __init__(self, display_size, picture_basename, picture_size, preview_size,  pose_time, display_time, slideshow_display_time, theme="default"):
         self.start_info_timer=5
         self.screensaver_timer=5
         self.slideshow_timer=slideshow_display_time
@@ -105,9 +109,9 @@ class Photobooth:
         self.picture_size = picture_size
         self.pose_time    = pose_time
         self.display_time = display_time
-
-        self.layout = Layout(1, self.picture_size)
-        self.filter=HighContrastMonochrome()
+        self.theme        = Theme(theme)
+        self.layout       = Layout(1, self.picture_size)
+        self.filter       = HighContrastMonochrome()
 
         self.current_page=None
         try:
@@ -127,29 +131,22 @@ class Photobooth:
     def run(self, fullscreen=True):
         self.display = GuiModule('Photobooth', self.display_size, fullscreen=fullscreen)
         self.current_page = StartPage(self)
+        # Enable lamp
+        self.display.gpio.set_output(GPIO_LAMP, 1)
 
-        self.init_display()
         while True:
             try:
-                # Enable lamp
-                self.gpio.set_output(self.lamp_channel, 1)
-
-                # Select idle screen type
-                if self.idle_slideshow:
-                    self._run_slideshow()
-                else:
-                    self._run_plain()
-
-            # Catch exceptions and display message
+                self.current_page.next_action()
+               # Catch exceptions and display message
             except camera.CameraException as e:
-                self.handle_exception(e.message)
+                self.current_page=ErrorPage(self,e.message)
             # Do not catch KeyboardInterrupt and SystemExit
             except (KeyboardInterrupt, SystemExit):
                 raise
-            except Exception as e:
-                print('SERIOUS ERROR: ' + repr(e))
-                self.handle_exception("SERIOUS ERROR!")
-                self.teardown()
+            #except Exception as e:
+            #    print('SERIOUS ERROR: ' + repr(e))
+            #    self.current_page = ErrorPage(self,'SERIOUS ERROR: \n' + repr(e))
+            #    self.teardown()
 
     def teardown(self):
         self.display.clear()
@@ -173,10 +170,9 @@ class Photobooth:
         self.current_page=LayoutOptPage(self)
     def show_result(self):
         self.current_page=ResultPage(self)
-
     def get_info_text(self):
         # todo: make infotext
-        return("Infotext")
+        return(self.pictures.get_info())
 
 #####################
 ### Display Pages ###
@@ -192,29 +188,31 @@ class DisplayPage:
         self.timer=timer
         self.overlay_text=overlay_text
         self.bg=bg
+        self.next_action=self.teardown # this is executed when __init__ finished (called in photobooth.run)
+        self.overlay_text_size=144
+
     def apply(self):
         self.display.clear()
         if self.bg is not None:
             self.display.show_picture(self.bg, self.display.get_size())
         if self.overlay_text is not None:
-            self.display.show_message(self.overlay_text)
+            self.display.show_message(self.overlay_text, size=self.overlay_text_size)
         self.display.apply()
 
     def start(self):
         self.apply()
-        self.run()
+        self.wait_for_event()
 
-    def run(self):
-        while True:
-            e = self.display.wait_for_event(self.timer)
-            self.handle_event(e)
+    def wait_for_event(self):
+        e = self.display.wait_for_event(self.timer)
+        self.handle_event(e)
 
     def handle_event(self,event):
         action = event.get_action()
         print(self.name + " handles "+str(event) +"--> action "+str(action))
         if action is not None and len(self.options) > action:
             if self.options[action] is not None:
-                self.options[action]()
+                self.next_action=self.options[action]
         if event.get_type() is 'quit':
             self.teardown()
 
@@ -233,6 +231,16 @@ class StartPage(DisplayPage):
         options=[pb.show_slideshow, pb.show_slideshow ]
         DisplayPage.__init__(self, "Start", pb.display,options,pb.start_info_timer)
         self.overlay_text=pb.get_info_text()
+        self.overlay_text_size = 60
+        self.start()
+
+class ErrorPage(DisplayPage):
+    def __init__(self, pb, msg):
+        DisplayPage.__init__(self, "Start", pb.display)
+
+        self.overlay_text=msg
+        self.timer=2
+        self.options=[self.teardown()]
         self.start()
 
 class SlideshowPage(DisplayPage):
@@ -254,7 +262,7 @@ class SlideshowPage(DisplayPage):
             self.bg = self.image_list.get(self.photo_idx)
         else:
             print("No Photos - skipping slideshow")
-            pb.show_main()
+            self.next_action=pb.show_main
         self.start()
 
     def jump_image_random(self):
@@ -263,6 +271,8 @@ class SlideshowPage(DisplayPage):
             self.photo_idx=random.randrange(1,self.n_img+1)
             self.bg = self.image_list.get(self.photo_idx)
             self.apply()
+            self.wait_for_event()
+
     def jump_image_frev(self):
         self.jump_image(-self.bigjump)
     def jump_image_rev(self):
@@ -285,6 +295,7 @@ class SlideshowPage(DisplayPage):
         self.bg = self.image_list.get(self.photo_idx)
 
         self.apply()
+        self.wait_for_event()
 
 class MainPage(DisplayPage):
     def __init__(self, pb):
@@ -292,13 +303,15 @@ class MainPage(DisplayPage):
         self.timer=pb.screensaver_timer
         self.options=[pb.show_slideshow,pb.show_shooting, pb.show_pictopt, pb.show_layoutopt,
              pb.teardown] #todo: add advanced opt
+        self.theme=pb.theme
         self.bg=self.get_bg()
         self.overlay_text="Main Menue"
         self.start()
 
     def get_bg(self):
+        fn=self.theme.get_file_name("mainpage")
         #todo load background and scale to resolution
-        return(None )
+        return(fn )
 
 
 class ShootingPage(DisplayPage):
@@ -308,6 +321,7 @@ class ShootingPage(DisplayPage):
         #self.bg=pb.get_preview_frame()
         self.posing_timer=pb.pose_time
         self.options=[self.take_pictures]
+        self.next=pb.show_result
         self.n_pictures=pb.layout.n_picture
         self.overlay_text ="Taking {} photos!".format(self.n_pictures)
         self.cam=pb.camera
@@ -319,15 +333,11 @@ class ShootingPage(DisplayPage):
         self.layout=pb.layout
         self.filter=pb.filter
         self.start()
-        self.layout.assemble_pictures(self.raw_filenames, self.result_filename, filter=self.filter)
-        pb.show_result()
 
-    def run(self):
-        e = self.display.wait_for_event(self.timer)
-        self.handle_event(e)
+
 
     def take_pictures(self):
-
+        self.next_action=self.next
         for i in range(self.n_pictures):
             print("taking picture "+str(i))
             t0=time()
@@ -345,6 +355,8 @@ class ShootingPage(DisplayPage):
             self.display.show_message("smile ;-)")
             self.display.apply()
             self.cam.take_picture(self.raw_filenames[i])
+        self.layout.assemble_pictures(self.raw_filenames, self.result_filename, filter=self.filter)
+
 
 class PictOptPage(DisplayPage):
     def __init__(self, pb):
@@ -352,7 +364,7 @@ class PictOptPage(DisplayPage):
         opt=[pb.show_slideshow,pb.show_main(), pb.toggle_pic_orientation, pb.toggle_pic_filter]
         bg=self.get_bg()
         DisplayPage.__init__(self, "Picture Options", pb.display,  options=opt, timer=timer, bg=bg)
-
+        self.start()
     def get_bg(self):
         #todo load background
         return None
@@ -363,6 +375,7 @@ class LayoutOptPage(DisplayPage):
         opt=[pb.show_slideshow,pb.set_layout_two, pb.set_layout_one, pb.set_layout_three]
         bg=self.get_bg()
         DisplayPage.__init__(self, "Layout Options", pb.display,  options=opt, timer=timer, bg=bg)
+        self.start()
 
     def get_bg(self):
         #todo load background from file
@@ -377,8 +390,8 @@ class ResultPage(DisplayPage):
         else:
             self.file_name=pb.pictures.get(photo_idx)
         img=self.file_name
-
         DisplayPage.__init__(self, "Results", pb.display, options=opt, timer=timer, bg=img)
+        self.start()
 
     def delete_pic(self):
         pass

@@ -117,9 +117,9 @@ class GUI_PyGame:
             surface = pygame.transform.flip(surface, True, False)
         self.surface_list.append((surface, offset))
 
-    def show_message(self, msg, color=(0, 0, 0), bg=(230, 230, 230), transparency=True, outline=(245, 245, 245)):
+    def show_message(self, msg, color=(0, 0, 0), bg=(230, 230, 230), transparency=True, outline=(245, 245, 245), size=144):
         # Choose font
-        font = pygame.font.Font(None, 144)
+        font = pygame.font.Font(None,size)
         # Wrap and render text
         wrapped_text, text_height = self.wrap_text(msg, font, self.size)
         rendered_text = self.render_text(wrapped_text, text_height, 1, 1, font, color, bg, transparency, outline)

@@ -1,14 +1,14 @@
 # photobooth
+This is yet another photobooth application written in python3 using a Raspberry Pi, gPhoto2 and pygame.
 
-This is yet another photobooth application. It is
 It's intended to run on raspberry pi 3 with following devices connected:
 * DSLR cam (Canon 650D)
 * touchscreen (Waveshare 7" HDMI 1024*600 Rev2.1)
 * big red pushbutton
 * printer (Canon selphy cp1300)
 
-## (planed) Features
-* camera types: gphoto2 (e.g. DLSR), openCV capture (webcam), picamera for raspberry pi
+## (planed) features
+* supported camera types: gphoto2 (e.g. DLSR), openCV capture (webcam), picamera for raspberry pi
 * idle state: slideshow of today's pictures
 * controlled touchscreen and optional GPIO button - or keyboard (mainly for testing)
 * different layouts (e.g. how pictures are arranged)
@@ -39,10 +39,6 @@ DSLRs (at least the 650D) can not (hardly) focus during preview.
         * placed in optical viewfinder
             * results in poor image quality
     * use other cam (no DSLR)
-
-## details
-* gphoto2 bining via
-* gui is based on pygame
 
 
 

@@ -1,0 +1,9 @@
+find a solution for focus during preview
+picam is broken (splitter)
+themes backgroud of pages
+mouse actions -> gui buttons
+if canon cannot focus it blocks the main process -
+use threads with timeoutfor take_picture?
+--> does 650D need restart?
+
+

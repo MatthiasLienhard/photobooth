@@ -248,6 +248,7 @@ class GUI_PyGame:
         return surface
 
     def convert_event(self, event):
+        print("event of type "+str(event.type))
         if event.type == pygame.QUIT:
             return True, events.Event(0, 0)
         elif event.type == pygame.KEYDOWN:
@@ -344,6 +345,9 @@ class TkGUI(tk.Tk):
 """
 
 if __name__ == "__main__":
-    gui=TkGUI(Photobooth())
-    gui.mainloop()
-
+    display = GUI_PyGame('Photobooth', (1024,600), fullscreen=False, hide_mouse=False)
+    display.show_message("testscreen")
+    display.show_button("b",pos=(100,100),size=(50,50),color=(230,230,230))
+    display.apply()
+    display.wait_for_event(5)
+    display.teardown()

@@ -152,7 +152,7 @@ class Photobooth:
         self.display.clear()
         self.display.show_message("Shutting down...")
         self.display.apply()
-        self.display.gpio.set_output(self.lamp_channel, 0)
+        self.display.gpio.set_output(GPIO_LAMP, 0)
         sleep(0.5)
         self.display.teardown()
         self.display.gpio.teardown()
@@ -184,7 +184,7 @@ class DisplayPage:
         self.display=display
         if len(options)==0 :
             options=[self.teardown]
-        self.options=options #0:timer 1:middle 2:left 3: right, 4: long middle 5: long left 6: long right
+        self.options=options # 0:timer 1:middle 2:left 3: right, 4: long middle 5: long left 6: long right
         self.timer=timer
         self.overlay_text=overlay_text
         self.bg=bg
@@ -304,7 +304,7 @@ class SlideshowPage(DisplayPage):
         self.wait_for_event()
 
 class MainPage(DisplayPage):
-    def __init__(self, pb):
+    def __init__(self, pb: Photobooth):
         DisplayPage.__init__(self, "Main", pb.display)
         self.timer=pb.screensaver_timer
         self.options=[pb.show_slideshow,pb.show_shooting, pb.show_pictopt, pb.show_layoutopt,
@@ -369,13 +369,13 @@ class ShootingPage(DisplayPage):
         self.bg=None
         self.overlay_text="processing..."
         self.apply()
-        self.cam.stop_preview_stream()
+        # self.cam.stop_preview_stream() todo: test does this crash 650D here??
 
         self.layout.assemble_pictures(self.raw_filenames, self.result_filename, filter=self.filter)
 
 
 class PictOptPage(DisplayPage):
-    def __init__(self, pb):
+    def __init__(self, pb: Photobooth) -> object:
         timer=pb.screensaver_timer
         opt=[pb.show_slideshow,pb.show_main(), pb.toggle_pic_orientation, pb.toggle_pic_filter]
         bg=self.get_bg()
@@ -386,7 +386,7 @@ class PictOptPage(DisplayPage):
         return None
 
 class LayoutOptPage(DisplayPage):
-    def __init__(self, pb):
+    def __init__(self, pb: Photobooth):
         timer=pb.screensaver_timer
         opt=[pb.show_slideshow,pb.set_layout_two, pb.set_layout_one, pb.set_layout_three]
         bg=self.get_bg()
@@ -398,7 +398,7 @@ class LayoutOptPage(DisplayPage):
         return None
 
 class ResultPage(DisplayPage):
-    def __init__(self, pb, photo_idx=None):
+    def __init__(self, pb: Photobooth, photo_idx=None):
         timer= pb.screensaver_timer
         opt=[  pb.show_slideshow,pb.show_main, self.delete_pic, self.print_pic ]
         if photo_idx is None:

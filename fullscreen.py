@@ -21,8 +21,6 @@ def main():
     # Display time for assembled picture
     display_time = 10
 
-    # Show a slideshow of existing pictures when idle
-    idle_slideshow = True
 
     # Display time of pictures in the slideshow
     slideshow_display_time = 5

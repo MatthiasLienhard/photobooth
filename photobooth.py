@@ -358,8 +358,13 @@ class ShootingPage(DisplayPage):
             self.display.show_message("smile ;-)")
             self.display.apply()
             self.cam.take_picture(self.raw_filenames[i])
+            self.display.show_picture(self.cam.get_preview_frame(filter=self.filter), flip=True)
 
+        self.bg=None
+        self.overlay_text="processing..."
+        self.appy()
         self.cam.stop_preview_stream()
+
         self.layout.assemble_pictures(self.raw_filenames, self.result_filename, filter=self.filter)
 
 

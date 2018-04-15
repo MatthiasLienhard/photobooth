@@ -167,10 +167,11 @@ class Camera_gPhoto(Camera):
             raise CameraException("Can not initialize gphoto camera: "+str(e))
 
     def start_preview_stream(self):
-        if 'viewfinder' in self.cam._get_config()['actions']:
-            self.cam._get_config()['actions']['viewfinder'].set(True)
-        else:
-            self.cam.get_preview()
+        self.cam.get_preview()
+        #if 'viewfinder' in self.cam._get_config()['actions']:
+        #    self.cam._get_config()['actions']['viewfinder'].set(True)
+        #else:
+        #    self.cam.get_preview()
 
     def stop_preview_stream(self):
         if 'viewfinder' in self.cam._get_config()['actions']:
@@ -179,11 +180,14 @@ class Camera_gPhoto(Camera):
 
     def get_preview_frame(self, filename=None, filter=None):
         data=self.cam.get_preview()
-        preview = Image.open(io.BytesIO(data))
+        img = Image.open(io.BytesIO(data))
+        if filter is not None:
+            img = filter.apply(img)
         if filename is None:
-            return(preview)
+            return(img)
         else:
-            preview.save(filename)
+            img.save(filename)
+
         # raise CameraException("No preview supported!")
 
     def take_picture(self, filename="/tmp/picture.jpg", filter=None):
@@ -210,4 +214,14 @@ class Camera_gPhoto(Camera):
 
     def focus(self):
         pass
-        # todo:define function
+        # todo define focus function
+
+def test_cam():
+
+    for i in range(10):
+        cam=gp.Camera()
+        cam._get_config()['actions']['viewfinder'].set(True)
+        t0=time.time()
+        cam.get_preview()
+        print(str(int((time.time()-t0)*100)))
+        #first frame takes 2 seconds

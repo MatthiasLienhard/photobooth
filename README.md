@@ -39,6 +39,7 @@ DSLRs (at least the 650D) can not (hardly) focus during preview.
         * placed in optical viewfinder
             * results in poor image quality
     * use other cam (no DSLR)
+Switching preview on and off takes 2 seconds
 
 
 

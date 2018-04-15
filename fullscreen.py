@@ -1,5 +1,7 @@
+#!/usr/bin/env python3
+
 from photobooth import Photobooth
-import datetime
+from datetime import datetime
 
 def main():
     # Screen size
@@ -30,3 +32,5 @@ def main():
     photobooth.run(fullscreen=True)
     photobooth.teardown()
     return 0
+
+exit(main())

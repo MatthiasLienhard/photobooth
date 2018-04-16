@@ -24,7 +24,6 @@ class Event:
         if type == 1 and value in (27,113): #ESC, q
             type=0
 
-
         self.type = type
         self.value = value
 
@@ -51,6 +50,8 @@ class Event:
                 return 2
             elif self.value == GPIO_RIGHT: #right
                 return 3
+        elif self.get_type() is 'mouseclick':
+            return self.value
         return None
 
 

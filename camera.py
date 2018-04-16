@@ -7,7 +7,7 @@ from PIL import Image, ImageDraw
 import io
 import cv2
 import warnings
-from time import sleep
+from time import sleep,time
 import filter
 
 try:
@@ -21,6 +21,8 @@ except ImportError:
 
 try:
     import picamera
+    from picamera.array import PiRGBArray
+
     picam_enabled=True
 except ImportError:
     picam_enabled=False
@@ -43,13 +45,13 @@ class Camera:
         d.text((10, 10), "Testimage", fill=(255, 255, 0))
         return(img)
 
-    def get_preview_frame(self, filename=None):
+    def get_preview_frame(self, filename=None, filter = None):
         img=self.get_test_image(self.preview_size)
         if filename is not None:
             img.save(filename)
         else:
             return img
-    def take_picture(self, filename="/tmp/picture.jpg"):
+    def take_picture(self, filename="/tmp/picture.jpg", filter = None):
         img=self.get_test_image(self.picture_size)
         if filename is not None:
             img.save(filename)
@@ -110,30 +112,41 @@ class Camera_pi(Camera):
         if not picam_enabled:
             raise CameraException("No PiCam module")
         try:
-            self.cam = picamera.PiCamera( framerate=10)
+            self.cam = picamera.PiCamera(framerate=5)
             self.cam.rotation = 0
-            self.cam.start_preview(alpha=0) # invisible preview
+            #self.cam.start_preview(alpha=0) # invisible preview
         except picamera.PiCameraError:
             raise CameraException("Cannot initialize PiCam")
-        self.preview_stream=None
+        self.preview_stream= picamera.PiCameraCircularIO(self.cam, seconds=1) # 17 MB
         self.preview_active=False
 
     def start_preview_stream(self):
-        self.preview_stream = picamera.PiCameraCircularIO(self.cam, seconds=1) # 17 MB
-        self.cam.start_recording(self.preview_stream, format='mjpeg',resize=self.preview_size)
-        self.preview_acitve = True
+        if not self.preview_active :
+            self.cam.start_preview(alpha=0)
+            self.cam.start_recording(self.preview_stream, format='mjpeg',resize=self.preview_size)
+            self.cam.wait_recording(.5)
+            self.preview_active = True
+        else:
+            self.cam.wait_recording(.5)
 
     def stop_preview_stream(self):
-        self.cam.stop_recording()
-        self.preview_acitve=False
+        if self.preview_active:
+            self.cam.stop_preview()
+            self.cam.stop_recording()
+            self.preview_active=False
 
 
     def get_preview_frame(self, filename=None, filter=None):
         if not self.preview_active:
             raise CameraException("preview inactive")
-        data = self.preview_stream.read1()
-        data = io.BytesIO(data)
-        img = Image.open(data)
+        #print("get preview frame")
+        #data = io.BytesIO()
+        #self.preview_stream.copy_to(data, first_frame=list(self.preview_stream.frames)[-1] )
+        stream = io.BytesIO()
+        self.cam.capture(stream, format='jpeg', use_video_port=True)#, resize=self.preview_size)
+
+        stream.seek(0)
+        img = Image.open(stream)
         if filter is not None:
             img = filter.apply(img)
         if filename is None:
@@ -144,6 +157,7 @@ class Camera_pi(Camera):
     def take_picture(self, filename=None, filter=None):
         stream = io.BytesIO()
         self.cam.capture(stream, format='jpeg', resize=self.picture_size)
+        stream.seek(0)
         img=Image.open(stream)
         if filter is not None:
             img = filter.apply(img)
@@ -218,10 +232,11 @@ class Camera_gPhoto(Camera):
 
 def test_cam():
 
+
+    cam=gp.Camera()
+    cam._get_config()['actions']['viewfinder'].set(True)
     for i in range(10):
-        cam=gp.Camera()
-        cam._get_config()['actions']['viewfinder'].set(True)
-        t0=time.time()
+        t0=time()
         cam.get_preview()
         print(str(int((time.time()-t0)*100)))
         #first frame takes 2 seconds

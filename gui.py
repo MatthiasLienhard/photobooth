@@ -15,10 +15,74 @@ import events
 
 GPIOEVENT=pygame.USEREVENT+1
 TIMEREVENT=pygame.USEREVENT+2
+BUTTONEVENT=pygame.USEREVENT+3
 
 
 class GuiException(Exception):
     """Custom exception class to handle GUI class errors"""
+
+class Button_PyGame:
+    def __init__(self, parent, action_value,adj=None, pos=None,size=None, img_fn=None,  text=None, font_color=(0,0,0),font_size=72,  color=None, frame_color=None):
+        self.text=text
+        self.font_size=font_size
+        self.font_color=font_color
+        self.action_value=action_value
+        if img_fn is None and size is None:
+            raise ValueError("specify either size or img")
+        if img_fn is not None:
+            img=pygame.image.load(img_fn)
+        else:
+            img=None
+
+        if size is None:
+            size=img.get_rect().size
+        elif img is not None:
+            pygame.transform.scale(img, size).convert()
+
+        if adj is None and pos is None:
+            raise ValueError("specify either adj or pos")
+
+        self.img=img
+        self.size=size
+        if pos is None:
+            pos=parent.get_offset(adj, size)
+        self.pos=pos
+        self.color=color
+        self.frame_color=frame_color
+        self.screen_size=parent.size
+
+    def get_surface(self):
+        # Create Surface object and fill it with the given background
+        surface = pygame.Surface(self.screen_size, pygame.SRCALPHA)
+        #surface.fill((0,0,0,255))
+        if self.img is not None:
+            surface.blit(self.img, self.pos)
+
+        if self.text is not None:
+            font = pygame.font.Font(None, self.font_size)
+            text_size = font.size(self.text)
+            text_pos=(self.pos[0] + (self.size[0] - text_size[0]) // 2,
+                      self.pos[1] + (self.size[1] - text_size[1]) // 2)
+            rendered_text = font.render(self.text, 1, self.font_color)
+            surface.blit(rendered_text, text_pos)
+
+        if self.frame_color is not None:
+            # Render outline
+            pygame.draw.rect(surface, self.frame_color, (self.pos[0] , self.pos[1] , self.size[0],self.size[1]), 1)
+
+        # Make background color transparent
+        #surface.set_colorkey(bg)
+        return(surface, (0,0))
+
+    def handle_click(self, pos):
+        if pos[0]>=self.pos[0] and pos[0] <= self.pos[0]+self.size[0] \
+            and pos[1] >= self.pos[1] and pos[1] <= self.pos[1] + self.size[1]:
+            print("button {} pressed!".format(self.action_value))
+            pygame.event.post(pygame.event.Event(BUTTONEVENT, action=self.action_value))
+
+
+
+
 
 
 class GUI_PyGame:
@@ -47,13 +111,27 @@ class GUI_PyGame:
         self.screen = pygame.display.set_mode(size, mode)
         self.gpio   = events.Rpi_GPIO(self.trigger_gpio_event)
 
+        self.buttons = []
+
         # Clear screen
         self.clear()
         self.apply()
 
+    def get_offset( self,adj,item_size):
+        pos=[0,0]
+        for i in range(2):
+            if adj[i] == 0:
+                pos[i] = 0
+            elif adj[i] == 1:
+                pos[i] = (self.size[i]-item_size[i])/2
+            elif adj[i] ==2:
+                pos[i] = (self.size[i])-item_size[i]
+        return tuple(pos)
+
     def clear(self, color=(0, 0, 0)):
         self.screen.fill(color)
         self.surface_list = []
+        self.buttons=[]
 
     def apply(self):
         for surface in self.surface_list:
@@ -71,7 +149,8 @@ class GUI_PyGame:
     def trigger_timer_event():
         pygame.event.post(pygame.event.Event(TIMEREVENT))
 
-    def show_picture(self, image = None, size=(0, 0), offset=(0, 0), flip=False):
+    def show_picture(self, image = None, size=(0, 0),adj=(0,0),offset=None, flip=False, scale=True):
+
 
         # Use window size if none given
         if size == (0, 0):
@@ -100,18 +179,23 @@ class GUI_PyGame:
             except pygame.error as msg:
                 raise GuiException("ERROR: Can't read image from buffer: " + msg)
 
-
-        # Extract image size and determine scaling
-        image_size = image.get_rect().size
-        image_scale = min([min(a, b) / b for a, b in zip(size, image_size)])
-        # New image size
-        new_size = [int(a * image_scale) for a in image_size]
-        # Update offset
-        offset = tuple(a + int((b - c) / 2) for a, b, c in zip(offset, size, new_size))
-        # Apply scaling and display picture
-        image = pygame.transform.scale(image, new_size).convert()
+        if scale:
+            # Extract image size and determine scaling
+            image_size = image.get_rect().size
+            image_scale = min([min(a, b) / b for a, b in zip(size, image_size)])
+            # New image size
+            new_size = [int(a * image_scale) for a in image_size]
+            # Update offset
+            if offset is None:
+                offset=self.get_offset(adj, size)
+            offset = tuple(a + int((b - c) / 2) for a, b, c in zip(offset, size, new_size))
+            # Apply scaling and display picture
+            image = pygame.transform.scale(image, new_size).convert()
+            size=new_size
+        elif offset is None:
+            offset=self.get_offset(adj, size)
         # Create surface and blit the image to it
-        surface = pygame.Surface(new_size)
+        surface = pygame.Surface(size)
         surface.blit(image, (0, 0))
         if flip:
             surface = pygame.transform.flip(surface, True, False)
@@ -126,31 +210,11 @@ class GUI_PyGame:
 
         self.surface_list.append((rendered_text, (0, 0)))
 
-    def show_button(self, text, pos, size=(0, 0), color=(230, 230, 230), bg=(0, 0, 0), transparency=True,
-                    outline=(230, 230, 230)):
-        # Choose font
-        font = pygame.font.Font(None, 72)
-        text_size = font.size(text)
-        if size == (0, 0):
-            size = (text_size[0] + 4, text_size[1] + 4)
-        offset = ((size[0] - text_size[0]) // 2, (size[1] - text_size[1]) // 2)
 
-        # Create Surface object and fill it with the given background
-        surface = pygame.Surface(self.size)
-        surface.fill(bg)
+    def add_button(self, *args, **kwargs):
+        self.buttons.append(Button_PyGame(self,*args, **kwargs))
+        self.surface_list.append(self.buttons[-1].get_surface())
 
-        # Render text
-        rendered_text = font.render(text, 1, color)
-        surface.blit(rendered_text, pos)
-
-        # Render outline
-        pygame.draw.rect(surface, outline, (pos[0] - offset[0], pos[1] - offset[0], size[0], size[1]), 1)
-
-        # Make background color transparent
-        if transparency:
-            surface.set_colorkey(bg)
-
-        self.surface_list.append((surface, (0, 0)))
 
     def wrap_text(self, msg, font, size):
         final_lines = []  # resulting wrapped text
@@ -248,19 +312,24 @@ class GUI_PyGame:
         return surface
 
     def convert_event(self, event):
-        print("event of type "+str(event.type))
         if event.type == pygame.QUIT:
             return True, events.Event(0, 0)
         elif event.type == pygame.KEYDOWN:
             return True, events.Event(1, event.key)
-        elif event.type == pygame.MOUSEBUTTONUP:
-            return True, events.Event(2, (event.button, event.pos))
+
         elif event.type == GPIOEVENT: #GPIO event
             return True, events.Event(3, event.channel)
         elif event.type == TIMEREVENT: #timer event
-            return True, events.Event(4)
-        else:
-            return False, ''
+            return True, events.Event(4,None)
+        elif event.type == BUTTONEVENT: #button event
+            print("Button {} clicked".format(event.action))
+            return True, events.Event(2,event.action)
+        elif event.type == pygame.MOUSEBUTTONUP:
+            for b in self.buttons:
+                b.handle_click(event.pos)
+            #return True, events.Event(2, (event.button, event.pos))
+
+        return False, ''
 
     def check_for_event(self):
         for event in pygame.event.get():
@@ -277,7 +346,7 @@ class GUI_PyGame:
             t.start()
         while True:
             # Discard all input that happened before entering the loop
-            pygame.event.get()
+            # pygame.event.get() not a good idea
 
             # Wait for event
             event = pygame.event.wait()
@@ -300,54 +369,23 @@ class GUI_PyGame:
         self.gpio.teardown()
         pygame.quit()
 
-"""
-class TkGUI(tk.Tk):
-    def __init__(self,photobooth):
-        super.__init__(photobooth)
-        pad=3
-        self.display_size=(self.winfo_screenwidth()-pad, self.winfo_screenheight())
-        self.geometry("{0}x{1}+0+0".format(self.winfo_screenwidth()-pad, self.winfo_screenheight()-pad))
-        self.photobooth=photobooth
-        self.display_page=StartDisplay(self.photobooth)
-        self.bind('<Return>', self.display_page.options[0])
-        self.bind('<Left>', self.display_page.options[1])
-        self.bind('<Right>', self.display_page.options[2])
-    def teardown(self):
-        #todo: cleanup
-        exit(0)
-    def add_overlay_text(self, text, col=(0,0,0), size=None, pos=(1,1), font="arial"):
-        if size is None:
-            size=self.resolution
-        ol_mask=self.text_overlay(text, size, font )
-        self.bg[ol_mask]=col
 
-    def text_overlay(text, size, font):
-        # modified from
-        # https://stackoverflow.com/questions/45947608/rendering-a-unicode-ascii-character-to-a-numpy-array
-        # Availability is platform dependent
-        # Create font
-        pil_font = PIL.ImageFont.truetype(font + ".ttf", size=size // len(text),
-                                      encoding="unic")
-        text_width, text_height = pil_font.getsize(text)
-
-        # create a blank canvas with extra space between lines
-        canvas = PIL.Image.new('RGB', [size, size], (255, 255, 255))
-
-        # draw the text onto the canvas
-        draw = PIL.ImageDraw.Draw(canvas)
-        offset = ((size - text_width) // 2,
-                  (size - text_height) // 2)
-        white = "#000000"
-        draw.text(offset, text, font=pil_font, fill=white)
-
-        # Convert the canvas into an array with values in [0, 1]
-        return np.asarray(canvas).astype(bool)
-"""
 
 if __name__ == "__main__":
+    import time
     display = GUI_PyGame('Photobooth', (1024,600), fullscreen=False, hide_mouse=False)
     display.show_message("testscreen")
-    display.show_button("b",pos=(100,100),size=(50,50),color=(230,230,230))
+    display.add_button(action_value=2, text="button", adj=(2, 1), size=(200, 50), font_color=(230, 0, 0), font_size=30,
+                       frame_color=(255, 255, 255))
     display.apply()
-    display.wait_for_event(5)
+    display.wait_for_event(10)
+    display.clear()
+    display.show_picture("themes/default/mainpage.png")
+    display.show_picture("themes/default/title.png", adj=(2,0))
+
+    display.add_button(action_value=3, adj=(0, 2), img_fn="themes/default/photo_options.png")
+    display.add_button(action_value=2, adj=(2, 2), img_fn="themes/default/layout_options.png")
+    display.add_button(action_value=1, adj=(1, 2), img_fn="themes/default/button.png")
+    display.apply()
+    display.wait_for_event(10)
     display.teardown()

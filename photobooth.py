@@ -17,10 +17,17 @@ from layouts import Layout
 from filter import *
 from events import Rpi_GPIO as GPIO
 from gui import GUI_PyGame as GuiModule
-import gui
-import numpy as np
+# import numpy as np
 import random
-import scipy.ndimage
+# import scipy.ndimage
+
+
+class PhotoboothException(Exception):
+    """Custom exception class to handle camera class errors"""
+    def __init__(self, message):
+        self.message = message
+
+
 #####################
 ### Configuration ###
 #####################
@@ -96,7 +103,8 @@ class Photobooth:
     It contains all the logic for the photobooth.
     """
 
-    def __init__(self, display_size, picture_basename, picture_size, preview_size,  pose_time, display_time, slideshow_display_time, theme="default"):
+    def __init__(self, display_size, picture_basename, picture_size, preview_size,  pose_time, display_time,
+                 slideshow_display_time, theme="default", dslr_preview=False):
         self.start_info_timer=5
         self.screensaver_timer=5
         self.slideshow_timer=slideshow_display_time
@@ -112,21 +120,42 @@ class Photobooth:
         self.theme        = Theme(theme)
         self.layout       = Layout(1, self.picture_size)
         self.filter       = HighContrastMonochrome()
-
+        self.errors=[]
         self.current_page=None
         try:
             self.camera = camera.Camera_gPhoto(picture_size, preview_size)
+            self.camera_type='dslr'
         except camera.CameraException as e:
             print(e)
             try:
                 self.camera = camera.Camera_pi(picture_size, preview_size)
+                self.camera_type='picam'
             except camera.CameraException as e:
                 print(e)
                 try:
                     self.camera = camera.Camera_cv(picture_size, preview_size)
+                    self.camera_type = 'webcam'
                 except camera.CameraException as e:
                     print(e)
                     self.camera = camera.Camera(picture_size, preview_size)
+                    self.camera_type = 'dummicam'
+
+
+        if self.camera_type is 'dslr' and not dslr_preview:
+            try:
+                self.preview_camera = camera.Camera_pi(preview_size, preview_size)
+                self.camera_type += ' and picam'
+            except camera.CameraException as e:
+                print(e)
+                try:
+                    self.preview_camera = camera.Camera_cv(preview_size, preview_size)
+                    self.camera_type += ' and webcam'
+                except camera.CameraException as e:
+                    print(e)
+                    self.preview_camera = camera.Camera(preview_size, preview_size)
+                    self.camera_type += ' and dummicam'
+        else:
+            self.preview_camera=self.camera
 
     def run(self, fullscreen=True):
         self.display = GuiModule('Photobooth', self.display_size, fullscreen=fullscreen)
@@ -138,14 +167,18 @@ class Photobooth:
             try:
                 self.current_page.next_action()
                # Catch exceptions and display message
-            except camera.CameraException as e:
-                self.current_page=ErrorPage(self,e.message)
+            #except camera.CameraException as e:
+            #    self.errors.append(e)
+            #    self.current_page.next_action=self.show_error
             # Do not catch KeyboardInterrupt and SystemExit
             except (KeyboardInterrupt, SystemExit):
                 raise
             #except Exception as e:
-            #    print('SERIOUS ERROR: ' + repr(e))
-            #    self.current_page = ErrorPage(self,'SERIOUS ERROR: \n' + repr(e))
+            #    msg='SERIOUS ERROR: ' + repr(e)
+            #    print(msg)
+            #    self.errors.append(PhotoboothException(msg))
+            #    self.current_page.next_action = self.show_error
+
             #    self.teardown()
 
     def teardown(self):
@@ -170,16 +203,18 @@ class Photobooth:
         self.current_page=LayoutOptPage(self)
     def show_result(self):
         self.current_page=ResultPage(self)
+    def show_error(self):
+        self.current_page = ErrorPage(self)
     def get_info_text(self):
         # todo: make infotext
-        return(self.pictures.get_info())
+        return("Camera: "+self.camera_type+"\n\n"+self.pictures.get_info())
 
 #####################
 ### Display Pages ###
 #####################
 
 class DisplayPage:
-    def __init__(self,name, display, options=[], timer=5, bg=None, overlay_text = None ):
+    def __init__(self, name, display, options=[], timer=5, bg=None, overlay_text = None ):
         self.name=name
         self.display=display
         if len(options)==0 :
@@ -194,7 +229,7 @@ class DisplayPage:
     def apply(self):
         self.display.clear()
         if self.bg is not None:
-            self.display.show_picture(self.bg, self.display.get_size())
+            self.display.show_picture(self.bg, size=self.display.get_size(), adj=(0,0))
         if self.overlay_text is not None:
             self.display.show_message(self.overlay_text, size=self.overlay_text_size)
         self.display.apply()
@@ -240,10 +275,10 @@ class StartPage(DisplayPage):
         self.start()
 
 class ErrorPage(DisplayPage):
-    def __init__(self, pb, msg):
+    def __init__(self, pb:Photobooth):
         DisplayPage.__init__(self, "Start", pb.display)
 
-        self.overlay_text=msg
+        self.overlay_text = pb.errors[-1].message
         self.timer=2
         self.options=[self.teardown()]
         self.start()
@@ -310,14 +345,17 @@ class MainPage(DisplayPage):
         self.options=[pb.show_slideshow,pb.show_shooting, pb.show_pictopt, pb.show_layoutopt,
              pb.teardown] #todo: add advanced opt
         self.theme=pb.theme
-        self.bg=self.get_bg()
         self.overlay_text="Main Menue"
         self.start()
 
-    def get_bg(self):
-        fn=self.theme.get_file_name("mainpage")
-        #todo load background and scale to resolution
-        return(fn )
+    def apply(self):
+        self.display.clear()
+        self.display.show_picture(self.theme.get_file_name("mainpage"))
+        #self.display.show_picture(self.theme.get_file_name("title"), adj=(2,0), scale=True)
+        self.display.add_button(action_value=3, adj=(0, 2), img_fn=self.theme.get_file_name("photo_options"))
+        self.display.add_button(action_value=2, adj=(2, 2), img_fn=self.theme.get_file_name("layout_options"))
+        self.display.add_button(action_value=1, adj=(1, 2), img_fn=self.theme.get_file_name("button"))
+        self.display.apply()
 
 
 class ShootingPage(DisplayPage):
@@ -331,7 +369,7 @@ class ShootingPage(DisplayPage):
         self.n_pictures=pb.layout.n_picture
         self.overlay_text ="Taking {} photos!".format(self.n_pictures)
         self.cam=pb.camera
-        self.cam.start_preview_stream()
+        self.prev_cam = pb.preview_camera
         #self.bg=self.cam.get_preview_frame()
         pic_list=pb.pictures
         self.result_filename=pic_list.get_next()
@@ -339,11 +377,8 @@ class ShootingPage(DisplayPage):
         self.layout=pb.layout
         self.filter=pb.filter
         self.apply()
-        self.cam.start_preview_stream()
+        self.prev_cam.start_preview_stream()
         self.wait_for_event()
-
-
-
 
     def take_pictures(self):
         self.next_action=self.next
@@ -354,7 +389,7 @@ class ShootingPage(DisplayPage):
             while countdown > 0:
                 countdown = self.posing_timer - time() + t0
                 self.overlay_text=str(math.ceil(countdown))
-                self.display.show_picture(self.cam.get_preview_frame(filter=self.filter), flip=True)
+                self.display.show_picture(self.prev_cam.get_preview_frame(filter=self.filter), flip=True)
                 self.display.show_message(self.overlay_text)
                 self.display.apply()
                 r , event = self.display.check_for_event()
@@ -364,7 +399,7 @@ class ShootingPage(DisplayPage):
             self.display.show_message("smile ;-)")
             self.display.apply()
             self.cam.take_picture(self.raw_filenames[i])
-            self.display.show_picture(self.cam.get_preview_frame(filter=self.filter), flip=True)
+            self.display.show_picture(self.prev_cam.get_preview_frame(filter=self.filter), flip=True)
 
         self.bg=None
         self.overlay_text="processing..."
@@ -375,7 +410,7 @@ class ShootingPage(DisplayPage):
 
 
 class PictOptPage(DisplayPage):
-    def __init__(self, pb: Photobooth) -> object:
+    def __init__(self, pb: Photobooth):
         timer=pb.screensaver_timer
         opt=[pb.show_slideshow,pb.show_main(), pb.toggle_pic_orientation, pb.toggle_pic_filter]
         bg=self.get_bg()

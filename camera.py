@@ -35,10 +35,13 @@ class CameraException(Exception):
         self.recoverable = recoverable
 
 class Camera:
-    def __init__(self, picture_size,preview_size, focal_length=30):
+    def __init__(self, picture_size,preview_size, focal_length=30, type="dummicam",name='dummicam' ):
         self.picture_size = picture_size
         self.focal_length = focal_length
         self.preview_size=preview_size
+        self.type=type
+        self.name=name
+
     def get_test_image(self, size):
         img = Image.new('RGB', size, color=(73, 109, 137))
         d = ImageDraw.Draw(img)
@@ -78,7 +81,7 @@ class Camera:
 
 class Camera_cv(Camera):
     def __init__(self, picture_size, preview_size, zoom=30):
-        Camera.__init__(self,picture_size, preview_size, zoom)
+        Camera.__init__(self,picture_size, preview_size, zoom, type='webcam')
         self.cam = cv2.VideoCapture(0)
         if not self.cam.isOpened():
             raise CameraException("No webcam found!")
@@ -108,7 +111,7 @@ class Camera_cv(Camera):
 class Camera_pi(Camera):
 
     def __init__(self, picture_size,preview_size, zoom =30):
-        Camera.__init__(self,picture_size, preview_size, zoom)
+        Camera.__init__(self,picture_size, preview_size, zoom, type='picam')
         if not picam_enabled:
             raise CameraException("No PiCam module")
         try:
@@ -173,7 +176,7 @@ class Camera_gPhoto(Camera):
     """Camera class providing functionality to take pictures using gPhoto 2"""
 
     def __init__(self, picture_size, preview_size, zoom=30):
-        Camera.__init__(self,picture_size, preview_size, zoom)
+        Camera.__init__(self,picture_size, preview_size, zoom, type='dslr')
         # Print the capabilities of the connected camera
         try:
             self.cam = gp.Camera()
@@ -230,13 +233,33 @@ class Camera_gPhoto(Camera):
         pass
         # todo define focus function
 
-def test_cam():
+def get_camera(picture_size, preview_size,priority_list=['dslr', 'picam', 'webcam', 'dummicam'], default_cam=None):
 
+    for type in priority_list:
+        if default_cam is not None and default_cam.type is type:
+            return default_cam
+        else:
+            cam=_get_camera(picture_size, preview_size, type)
+            if cam is not None:
+                return cam
 
-    cam=gp.Camera()
-    cam._get_config()['actions']['viewfinder'].set(True)
-    for i in range(10):
-        t0=time()
-        cam.get_preview()
-        print(str(int((time.time()-t0)*100)))
-        #first frame takes 2 seconds
+def _get_camera(picture_size, preview_size, type):
+    if type=='dslr':
+        try:
+            return Camera_gPhoto(picture_size, preview_size)
+        except CameraException:
+            return None
+    elif type=='picam':
+        try:
+            return Camera_pi(picture_size, preview_size)
+        except CameraException:
+            return None
+    elif type=='webcam':
+        try:
+            return Camera_cv(picture_size, preview_size)
+        except CameraException as e:
+            return None
+    elif type is 'dummicam':
+        return Camera(picture_size, preview_size)
+    else:
+        raise CameraException("Camera type {} not implemented".format(type))

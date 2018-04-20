@@ -1,9 +1,25 @@
 find a solution for focus during preview
-picam is broken (splitter)
-themes backgroud of pages
-mouse actions -> gui buttons
-if canon cannot focus it blocks the main process -
-use threads with timeoutfor take_picture?
---> does 650D need restart?
+picam: do I need circular stream?
+layouts and filters redesign:
+    photobooth.layout_opt /.filter_opt = int
+    layout.draw_layout([photo filenames],logo, layout_opt, filter_opt, orientation=auto)
+    layout.get_filter(idx,layout_opt, filter_opt)
+    implement different layouts und filters
+gui buttons:
+    reverse order
+    nullbutton?
+take foto page:
+    focus
+    action1: take picture immediately (overload event handler?)
+    show in layout?
+camera:
+    focus_during_preview
+    later: add camera: sony wlan?
+
+Einstellungen der kamera (650d):
+    Kontinuierlicher autofokus bei live view aus!!!
+    ISO 100, kurze verschlusszeit, blitz
+    later: manual mode, ISO/blende/verschlusszeit/weisabgleich einstellbar in app?
+
 
 

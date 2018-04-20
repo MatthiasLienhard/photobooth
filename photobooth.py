@@ -122,40 +122,9 @@ class Photobooth:
         self.filter       = HighContrastMonochrome()
         self.errors=[]
         self.current_page=None
-        try:
-            self.camera = camera.Camera_gPhoto(picture_size, preview_size)
-            self.camera_type='dslr'
-        except camera.CameraException as e:
-            print(e)
-            try:
-                self.camera = camera.Camera_pi(picture_size, preview_size)
-                self.camera_type='picam'
-            except camera.CameraException as e:
-                print(e)
-                try:
-                    self.camera = camera.Camera_cv(picture_size, preview_size)
-                    self.camera_type = 'webcam'
-                except camera.CameraException as e:
-                    print(e)
-                    self.camera = camera.Camera(picture_size, preview_size)
-                    self.camera_type = 'dummicam'
-
-
-        if self.camera_type is 'dslr' and not dslr_preview:
-            try:
-                self.preview_camera = camera.Camera_pi(preview_size, preview_size)
-                self.camera_type += ' and picam'
-            except camera.CameraException as e:
-                print(e)
-                try:
-                    self.preview_camera = camera.Camera_cv(preview_size, preview_size)
-                    self.camera_type += ' and webcam'
-                except camera.CameraException as e:
-                    print(e)
-                    self.preview_camera = camera.Camera(preview_size, preview_size)
-                    self.camera_type += ' and dummicam'
-        else:
-            self.preview_camera=self.camera
+        self.camera = camera.get_camera(picture_size, preview_size)
+        # self.preview_camera=camera.get_camera(picture_size, preview_size,['picam', 'webcam', 'dslr','dummicam'], self.camera)
+        self.preview_camera=camera.get_camera(picture_size, preview_size,default_cam=self.camera)
 
     def run(self, fullscreen=True):
         self.display = GuiModule('Photobooth', self.display_size, fullscreen=fullscreen)
@@ -205,9 +174,15 @@ class Photobooth:
         self.current_page=ResultPage(self)
     def show_error(self):
         self.current_page = ErrorPage(self)
+    def camera_info(self):
+        info=self.camera.type
+        if self.preview_camera != self.camera:
+            info += " and "+ self.preview_camera.type
+        return info
+
     def get_info_text(self):
         # todo: make infotext
-        return("Camera: "+self.camera_type+"\n\n"+self.pictures.get_info())
+        return("Camera: "+self.camera_info()+"\n\n"+self.pictures.get_info())
 
 #####################
 ### Display Pages ###
@@ -307,12 +282,14 @@ class SlideshowPage(DisplayPage):
         self.start()
 
     def jump_image_random(self):
-        old_idx=self.photo_idx
-        while self.photo_idx is old_idx:
-            self.photo_idx=random.randrange(1,self.n_img+1)
+        if (self.n_img > 1):
+            old_idx=self.photo_idx
+            while self.photo_idx is old_idx:
+                self.photo_idx=random.randrange(1,self.n_img+1)
             self.bg = self.image_list.get(self.photo_idx)
             self.apply()
-            self.wait_for_event()
+
+        self.wait_for_event()
 
     def jump_image_frev(self):
         self.jump_image(-self.bigjump)

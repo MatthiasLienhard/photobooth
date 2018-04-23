@@ -19,6 +19,7 @@ from events import Rpi_GPIO as GPIO
 from gui import GUI_PyGame as GuiModule
 # import numpy as np
 import random
+import sys
 # import scipy.ndimage
 
 
@@ -448,7 +449,7 @@ class ResultPage(DisplayPage):
 ### Functions ###
 #################
 
-def main():
+def main(fullscreen):
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
     display_size = (1024, 600)
     image_size = (2352, 1568)
@@ -468,9 +469,9 @@ def main():
 
     photobooth = Photobooth(display_size, picture_basename, image_size, preview_size, pose_time, display_time,
                              slideshow_display_time)
-    photobooth.run(fullscreen=False)
+    photobooth.run(fullscreen=fullscreen)
     photobooth.teardown()
     return 0
 
 if __name__ == "__main__":
-    exit(main())
+    exit(main("--fullscreen" in sys.argv))

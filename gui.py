@@ -12,7 +12,7 @@ import random
 #import pygame.event as EventModule
 import pygame.event
 import events
-
+import os
 GPIOEVENT=pygame.USEREVENT+1
 TIMEREVENT=pygame.USEREVENT+2
 BUTTONEVENT=pygame.USEREVENT+3
@@ -99,7 +99,9 @@ class GUI_PyGame:
 
         # Hide mouse cursor
         if hide_mouse:
-            pygame.mouse.set_cursor(*pygame.cursors.load_xbm('transparent.xbm', 'transparent.msk'))
+            pygame.mouse.set_cursor(*pygame.cursors.load_xbm(
+                os.path.dirname(os.path.abspath(__file__))+'/transparent.xbm',
+                os.path.dirname(os.path.abspath(__file__))+'/transparent.msk'))
 
         # Store screen and size
         self.size = size

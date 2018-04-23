@@ -106,7 +106,7 @@ class Photobooth:
     def __init__(self, display_size, picture_basename, picture_size, preview_size,  pose_time, display_time,
                  slideshow_display_time, theme="default", dslr_preview=False):
         self.start_info_timer=5
-        self.screensaver_timer=5
+        self.screensaver_timer=30
         self.slideshow_timer=slideshow_display_time
         self.display=None
         self.display_size=display_size
@@ -127,7 +127,7 @@ class Photobooth:
         # self.preview_camera=camera.get_camera(picture_size, preview_size,['picam', 'webcam', 'dslr','dummicam'], self.camera)
         self.preview_camera=camera.get_camera(picture_size, preview_size,default_cam=self.camera)
     def set_layout(self):
-        self.layout = Layout(self.layout_opt, size=self.picture_size, filter_type=self.filter_opt, frame_wd=20)
+        self.layout = Layout(self.layout_opt, size=self.picture_size, filter_type=self.filter_opt)
 
     def toggle_layout(self):
         self.layout_opt+=1
@@ -293,6 +293,15 @@ class SlideshowPage(DisplayPage):
             self.next_action=pb.show_main
         self.start()
 
+    def apply(self):
+        self.display.clear()
+        self.display.add_button(action_value=1, pos=(0,0),size=self.display.size)
+        if self.bg is not None:
+            self.display.show_picture(self.bg, size=self.display.get_size(), adj=(0,0))
+        if self.overlay_text is not None:
+            self.display.show_message(self.overlay_text, size=self.overlay_text_size)
+        self.display.apply()
+
     def jump_image_random(self):
         if (self.n_img > 1):
             old_idx=self.photo_idx
@@ -352,8 +361,7 @@ class MainPage(DisplayPage):
         self.display.apply()
 
     def set_example_img(self):
-        self.example_img = self.pb.layout.assemble_pictures(self.example_img_raw * self.pb.layout.n_picture)
-        self.example_img.thumbnail((600,400))
+        self.example_img = self.pb.layout.assemble_pictures(self.example_img_raw * self.pb.layout.n_picture, (600,400))
         self.example_img=self.example_img.rotate(10,expand=True)
     def handle_event(self,event):
         action = event.get_action()
@@ -420,7 +428,7 @@ class ShootingPage(DisplayPage):
 class ResultPage(DisplayPage):
     def __init__(self, pb: Photobooth, photo_idx=None):
         timer= pb.screensaver_timer
-        opt=[ pb.show_slideshow,pb.show_main, self.delete_pic, self.print_pic ]
+        opt=[ pb.show_main,pb.show_main, self.delete_pic, self.print_pic ]
         if photo_idx is None:
             self.file_name=pb.pictures.get_last()
         else:
@@ -441,25 +449,19 @@ class ResultPage(DisplayPage):
 #################
 
 def main():
-    # Screen size
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
     display_size = (1024, 600)
-
-    # Maximum size of assembled image
     image_size = (2352, 1568)
-
-    preview_size = display_size
+    preview_size = (900,600)
 
     # Image basename
     picture_basename = datetime.now().strftime("%Y-%m-%d/photobooth_%Y-%m-%d_")
 
     # Waiting time in seconds for posing
-    pose_time = 3
+    pose_time = 5
 
     # Display time for assembled picture
     display_time = 10
-
-    # Show a slideshow of existing pictures when idle
-    idle_slideshow = True
 
     # Display time of pictures in the slideshow
     slideshow_display_time = 5

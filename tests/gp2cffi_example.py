@@ -1,5 +1,7 @@
 import time
 import gphoto2cffi as gp
+
+gp.list_cameras()[0]
 cam=gp.Camera()
 cam._get_config()['actions']['viewfinder'].set(True)
 for i in range(20):
@@ -11,12 +13,19 @@ for i in range(20):
 
 
 cam._get_config()['actions']['viewfinder'].set(False)
+#also takes 2 seconds
+
 cam._get_config()['actions']['eosremoterelease'].set('Press Half')
 time.sleep(1)
 cam._get_config()['actions']['eosremoterelease'].set('Release Full')
 cam._get_config()['actions']['viewfinder'].set(True)
 time.sleep(1)
 cam._get_config()['actions']['eosremoterelease'].set('Immediate')
+cam._get_config()['actions']['eosremoterelease'].set('Release Full')
+
+
+
+cam._get_config()['actions']['eosremoterelease'].set('Press Half')
 
 
 cam._get_config()['actions']['viewfinder'].set(False)

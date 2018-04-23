@@ -1,9 +1,6 @@
 find a solution for focus during preview
 picam: do I need circular stream?
 layouts and filters redesign:
-    photobooth.layout_opt /.filter_opt = int
-    layout.draw_layout([photo filenames],logo, layout_opt, filter_opt, orientation=auto)
-    layout.get_filter(idx,layout_opt, filter_opt)
     implement different layouts und filters
 gui buttons:
     reverse order

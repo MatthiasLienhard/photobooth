@@ -149,7 +149,7 @@ class GUI_PyGame:
     def trigger_timer_event():
         pygame.event.post(pygame.event.Event(TIMEREVENT))
 
-    def show_picture(self, image = None, size=(0, 0),adj=(0,0),offset=None, flip=False, scale=True):
+    def show_picture(self, image, size=(0, 0),adj=(1,1),offset=None, flip=False, scale=True):
 
 
         # Use window size if none given
@@ -162,6 +162,7 @@ class GUI_PyGame:
                 image = pygame.image.load(filename)
             except pygame.error as msg:
                 raise GuiException("ERROR: Can't open image '" + filename + "': " + str(msg))
+
         else:
             try:
                 mode = image.mode
@@ -340,13 +341,14 @@ class GUI_PyGame:
 
     def wait_for_event(self, time=None):
         # Repeat until a relevant event happened
-
+        r,e=self.check_for_event()
+        if r:
+            return e
         if time is not None:
             t = threading.Timer(time, self.trigger_timer_event)
             t.start()
         while True:
             # Discard all input that happened before entering the loop
-            # pygame.event.get() not a good idea
 
             # Wait for event
             event = pygame.event.wait()

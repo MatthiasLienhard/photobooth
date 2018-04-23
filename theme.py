@@ -7,9 +7,9 @@ class Theme:
         self.name=name
         self.stem=stem
 
-    def get_file_name(self, what="mainpage"):
-        specific=self.stem + self.name + '/' + what + ".png"
-        default=self.stem + 'default/' + what + ".png"
+    def get_file_name(self, what="mainpage", suffix=".png"):
+        specific=self.stem + self.name + '/' + what + suffix
+        default=self.stem + 'default/' + what + suffix
         if os.path.isfile(specific):
             return specific
         elif os.path.isfile(default):

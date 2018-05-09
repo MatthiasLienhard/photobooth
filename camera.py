@@ -7,8 +7,13 @@ from PIL import Image, ImageDraw
 import io
 import cv2
 import warnings
-from time import sleep,time
-import filter
+import time
+try:
+    from pysony import SonyAPI, ControlPoint
+    import requests
+except ImportError:
+    sony_enabled=False
+    warnings.warn("pysony not installed. To use sony wifi api camera install pysony module.")
 
 try:
     import gphoto2cffi as gp
@@ -22,11 +27,10 @@ except ImportError:
 try:
     import picamera
     from picamera.array import PiRGBArray
-
     picam_enabled=True
 except ImportError:
     picam_enabled=False
-    warnings.warn("raspberry pi module not installed. To use PiCam install picamera module.")
+    warnings.warn("raspberry pi camera module not installed. To use PiCam install picamera module.")
 
 class CameraException(Exception):
     """Custom exception class to handle camera class errors"""
@@ -77,7 +81,79 @@ class Camera:
         return self.focal_length
 
 
+class Camera_sonywifi(Camera):
+    def __init__(self, picture_size, preview_size, zoom=30, ssid="DIRECT-LKE0:ILCE-6000", pw="UeyxbxAG", iface="wlp2s0"):
+        Camera.__init__(self, picture_size, preview_size, zoom, type='sony_wifi')
+        self.previous_wifi="yesman 1" #todo: get the current wifi NAME! not ssid eg with nmcli con show --active or iwgetid -r
+        self.sony_api_version="1.0"
+        try:
+            subprocess.check_call(["nmcli",  "con",  "up", "id", ssid])
+        except subprocess.CalledProcessError:
+            raise CameraException("Cannot connect to wifi")
+        search = ControlPoint()
+        cameras = search.discover()
 
+        if len(cameras):
+            self.camera = SonyAPI(QX_ADDR=cameras[0])
+        else:
+            raise CameraException("No camera found")
+        options = self.camera.getAvailableApiList()['result'][0]
+        print(str(options))
+
+    def __del__(self):
+        try:
+            subprocess.check_call(["nmcli", "con", "up", "id", self.previous_wifi])
+        except subprocess.CalledProcessError:
+            raise CameraException("Cannot connect to previous wifi " + self.previous_wifi)
+
+    def start_preview_stream(self):
+        # For those cameras which need it
+        options = self.camera.getAvailableApiList()['result'][0]
+
+        if 'startRecMode' in options:
+            self.camera.startRecMode()
+            time.sleep(1)
+            options = self.camera.getAvailableApiList()['result'][0]
+            print(str(options))
+        self.camera.setLiveviewFrameInfo([{"frameInfo": False}])
+        url = self.camera.liveview()
+        assert isinstance(url, str)
+        print(url)
+        self.live_stream = SonyAPI.LiveviewStreamThread(url)
+        self.live_stream.start()
+        self.preview_active = True
+
+    def stop_preview_stream(self):
+        options = self.camera.getAvailableApiList()['result'][0]
+        #if self.preview_active and 'endRecMode' in (options):
+        #     self.camera.stopRecMode()
+        #if self.live_stream.is_alive():
+        #    self.camera.stopLiveview() # todo:  is this correct?
+        self.preview_active = False
+
+
+    def get_preview_frame(self, filename=None, filter=None):
+        data = self.live_stream.get_latest_view()
+        img = Image.open(io.BytesIO(data))
+        if filter is not None:
+            img = filter.apply(img)
+        if filename is None:
+            return (img)
+        else:
+            img.save(filename)
+
+    def take_picture(self, filename="/tmp/picture.jpg", filter=None):
+        options = self.camera.getAvailableApiList()['result'][0]
+        url = self.camera.actTakePicture()
+        print(url)
+        response = requests.get(url['result'][0][0].replace('\\', ''))
+        img=Image.open(io.BytesIO(response.content))
+        if filter is not None:
+            img = filter.apply(img)
+        if filename is None:
+            return (img)
+        else:
+            img.save(filename)
 
 class Camera_cv(Camera):
     def __init__(self, picture_size, preview_size, zoom=30):
@@ -109,7 +185,6 @@ class Camera_cv(Camera):
             return(img)
 
 class Camera_pi(Camera):
-
     def __init__(self, picture_size,preview_size, zoom =30):
         Camera.__init__(self,picture_size, preview_size, zoom, type='picam')
         if not picam_enabled:
@@ -233,7 +308,7 @@ class Camera_gPhoto(Camera):
         pass
         # todo define focus function
 
-def get_camera(picture_size, preview_size,priority_list=['dslr', 'picam', 'webcam', 'dummicam'], default_cam=None):
+def get_camera(picture_size, preview_size,priority_list=['sony_wifi', 'dslr', 'picam', 'webcam', 'dummicam'], default_cam=None):
 
     for type in priority_list:
         if default_cam is not None and default_cam.type is type:
@@ -244,7 +319,12 @@ def get_camera(picture_size, preview_size,priority_list=['dslr', 'picam', 'webca
                 return cam
 
 def _get_camera(picture_size, preview_size, type):
-    if type=='dslr':
+    if type=='sony_wifi':
+        try:
+            return Camera_sonywifi(picture_size, preview_size)
+        except CameraException:
+            return None
+    elif type=='dslr':
         try:
             return Camera_gPhoto(picture_size, preview_size)
         except CameraException:

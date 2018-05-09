@@ -139,7 +139,6 @@ class GUI_PyGame:
         for surface in self.surface_list:
             self.screen.blit(surface[0], surface[1])
         pygame.display.update()
-
     def get_size(self):
         return self.size
 

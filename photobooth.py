@@ -206,7 +206,9 @@ class Photobooth:
 #####################
 
 class DisplayPage:
-    def __init__(self, name, pb:Photobooth, options=[], timer=5, bg=None, overlay_text = None ):
+    def __init__(self, name, pb:Photobooth, options=None, timer=5, bg=None, overlay_text = None):
+        if options is None:
+            options = []
         self.name=name
         self.pb=pb
         if len(options)==0 :
@@ -350,7 +352,7 @@ class MainPage(DisplayPage):
 
         self.pb.display.show_picture(self.example_img, adj=(1, 0), scale=True)
 
-        self.pb.display.add_button(action_value=2, adj=(0, 2), img_fn=self.pb.theme.get_file_name("photo_options"))
+        self.pb.display.add_button(action_value=2, adj=(0, 2), img_fn=self.pb.theme.get_file_name("filter_options"))
         self.pb.display.add_button(action_value=3, adj=(2, 2), img_fn=self.pb.theme.get_file_name("layout_options"))
         self.pb.display.add_button(action_value=1, adj=(1, 2), img_fn=self.pb.theme.get_file_name("button"))
         self.pb.display.apply()

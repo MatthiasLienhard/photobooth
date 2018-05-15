@@ -8,9 +8,15 @@ import io
 import cv2
 import warnings
 import time
+import os
 try:
+    import sys
+    sys.path.insert(0, os.path.dirname(os.getcwd())+"/sony_camera_api/src")
+    #/home/matthias/projects/github/sony_camera_api/src")
     from pysony import SonyAPI, ControlPoint
     import requests
+
+    sony_enabled = True
 except ImportError:
     sony_enabled=False
     warnings.warn("pysony not installed. To use sony wifi api camera install pysony module.")
@@ -80,14 +86,21 @@ class Camera:
         self.focal_length=focal_length
         return self.focal_length
 
+    def teardown(self):
+        pass
+
 
 class Camera_sonywifi(Camera):
     def __init__(self, picture_size, preview_size, zoom=30, ssid="DIRECT-LKE0:ILCE-6000", pw="UeyxbxAG", iface="wlp2s0"):
         Camera.__init__(self, picture_size, preview_size, zoom, type='sony_wifi')
+        self.live_stream = None
+        if not sony_enabled:
+            raise CameraException("pysony module not installed")
         self.previous_wifi="yesman 1" #todo: get the current wifi NAME! not ssid eg with nmcli con show --active or iwgetid -r
         self.sony_api_version="1.0"
         try:
             subprocess.check_call(["nmcli",  "con",  "up", "id", ssid])
+            # takes forever. only try to c
         except subprocess.CalledProcessError:
             raise CameraException("Cannot connect to wifi")
         search = ControlPoint()
@@ -101,6 +114,11 @@ class Camera_sonywifi(Camera):
         print(str(options))
 
     def __del__(self):
+        self.teardown()
+
+    def teardown(self):
+        if self.live_stream is not None:
+            self.stop_preview_stream()
         try:
             subprocess.check_call(["nmcli", "con", "up", "id", self.previous_wifi])
         except subprocess.CalledProcessError:
@@ -109,7 +127,7 @@ class Camera_sonywifi(Camera):
     def start_preview_stream(self):
         # For those cameras which need it
         options = self.camera.getAvailableApiList()['result'][0]
-
+        print("starting preview")
         if 'startRecMode' in options:
             self.camera.startRecMode()
             time.sleep(1)
@@ -124,6 +142,10 @@ class Camera_sonywifi(Camera):
         self.preview_active = True
 
     def stop_preview_stream(self):
+        print("stopping preview")
+        if self.live_stream is not None:
+            #self.live_stream.kill()
+            self.live_stream.stop()
         options = self.camera.getAvailableApiList()['result'][0]
         #if self.preview_active and 'endRecMode' in (options):
         #     self.camera.stopRecMode()

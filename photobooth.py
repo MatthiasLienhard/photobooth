@@ -96,6 +96,9 @@ class PictureList:
         info=("Pictures:\nNumber of existing files: " + str(self.counter))
         info+=("\nSaving assembled pictures as: " + self.dirname +"/" + self.basename + "XXXXX.jpg")
         return(info)
+    def delete_pic(self):
+        self.counter -=1
+
 
 
 class Photobooth:
@@ -172,6 +175,7 @@ class Photobooth:
         self.display.show_message("Shutting down...")
         self.display.apply()
         self.display.gpio.set_output(GPIO_LAMP, 0)
+        self.camera.teardown()
         sleep(0.5)
         self.display.teardown()
         self.display.gpio.teardown()
@@ -202,34 +206,34 @@ class Photobooth:
 #####################
 
 class DisplayPage:
-    def __init__(self, name, display, options=[], timer=5, bg=None, overlay_text = None ):
+    def __init__(self, name, pb:Photobooth, options=[], timer=5, bg=None, overlay_text = None ):
         self.name=name
-        self.display=display
+        self.pb=pb
         if len(options)==0 :
-            options=[self.teardown]
+            options=[self.pb.teardown]
         self.options=options # 0:timer 1:middle 2:left 3: right, 4: long middle 5: long left 6: long right
         self.timer=timer
         self.overlay_text=overlay_text
         self.bg=bg
-        self.next_action=self.teardown # this is executed when __init__ finished (called in photobooth.run)
+        self.next_action=self.pb.teardown # this is executed when __init__ finished (called in photobooth.run)
         self.overlay_text_size=144
 
     def apply(self):
-        self.display.clear()
+        self.pb.display.clear()
         if self.bg is not None:
-            self.display.show_picture(self.bg, size=self.display.get_size(), adj=(0,0))
+            self.pb.display.show_picture(self.bg, size=self.pb.display.get_size(), adj=(0,0))
         if self.overlay_text is not None:
-            self.display.show_message(self.overlay_text, size=self.overlay_text_size)
-        self.display.apply()
+            self.pb.display.show_message(self.overlay_text, size=self.overlay_text_size)
+        self.pb.display.apply()
 
     def start(self):
         self.apply()
         self.wait_for_event()
 
     def wait_for_event(self):
-        e = self.display.wait_for_event(self.timer)
+        e = self.pb.display.wait_for_event(self.timer)
         while not self.handle_event(e):
-            e = self.display.wait_for_event(self.timer)
+            e = self.pb.display.wait_for_event(self.timer)
         print("leaving loop" )
 
     def handle_event(self,event):
@@ -240,40 +244,31 @@ class DisplayPage:
                 self.next_action=self.options[action]
                 return True
         if event.get_type() is 'quit':
-            self.teardown()
+            self.pb.teardown()
         return False
 
 
-    def teardown(self):
-        self.display.clear()
-        self.display.show_message("Shutting down...")
-        self.display.apply()
-        self.display.gpio.set_output(GPIO_LAMP, 0)
-        sleep(0.5)
-        self.display.teardown()
-
-        exit(0)
 
 class StartPage(DisplayPage):
     def __init__(self, pb):
         options=[pb.show_slideshow, pb.show_slideshow ]
-        DisplayPage.__init__(self, "Start", pb.display,options,pb.start_info_timer)
+        DisplayPage.__init__(self, "Start", pb,options,pb.start_info_timer)
         self.overlay_text=pb.get_info_text()
         self.overlay_text_size = 60
         self.start()
 
 class ErrorPage(DisplayPage):
     def __init__(self, pb:Photobooth):
-        DisplayPage.__init__(self, "Start", pb.display)
+        DisplayPage.__init__(self, "Start", pb)
 
         self.overlay_text = pb.errors[-1].message
         self.timer=2
-        self.options=[self.teardown()]
+        self.options=[self.pb.teardown()]
         self.start()
 
 class SlideshowPage(DisplayPage):
     def __init__(self, pb, photo_idx=None,overlay="<Press the Button>"):
-        DisplayPage.__init__(self, "Slideshow", pb.display)
+        DisplayPage.__init__(self, "Slideshow", pb)
 
         self.timer=pb.slideshow_timer
         self.options=[ self.jump_image_random,pb.show_main, self.jump_image_rev, self.jump_image_fwd,
@@ -295,13 +290,13 @@ class SlideshowPage(DisplayPage):
         self.start()
 
     def apply(self):
-        self.display.clear()
-        self.display.add_button(action_value=1, pos=(0,0),size=self.display.size)
+        self.pb.display.clear()
+        self.pb.display.add_button(action_value=1, pos=(0,0),size=self.pb.display.size)
         if self.bg is not None:
-            self.display.show_picture(self.bg, size=self.display.get_size(), adj=(0,0))
+            self.pb.display.show_picture(self.bg, size=self.pb.display.get_size(), adj=(0,0))
         if self.overlay_text is not None:
-            self.display.show_message(self.overlay_text, size=self.overlay_text_size)
-        self.display.apply()
+            self.pb.display.show_message(self.overlay_text, size=self.overlay_text_size)
+        self.pb.display.apply()
 
     def jump_image_random(self):
         if (self.n_img > 1):
@@ -339,27 +334,26 @@ class SlideshowPage(DisplayPage):
 
 class MainPage(DisplayPage):
     def __init__(self, pb: Photobooth):
-        DisplayPage.__init__(self, "Main", pb.display)
+        DisplayPage.__init__(self, "Main", pb)
         self.timer=pb.screensaver_timer
         self.options=[pb.show_slideshow,pb.show_shooting, pb.toggle_filter, pb.toggle_layout,
              pb.teardown] #todo: add camera opt
-        self.pb=pb
         self.overlay_text="Main Menue"
         self.example_img_raw = open_images([self.pb.theme.get_file_name("test_picture", ".jpg")])
         self.set_example_img()
         self.start()
 
     def apply(self):
-        self.display.clear()
-        self.display.show_picture(self.pb.theme.get_file_name("mainpage"))
+        self.pb.display.clear()
+        self.pb.display.show_picture(self.pb.theme.get_file_name("mainpage"))
         #self.display.show_picture(self.theme.get_file_name("title"), adj=(2,0), scale=True)
 
-        self.display.show_picture(self.example_img, adj=(1, 0), scale=True)
+        self.pb.display.show_picture(self.example_img, adj=(1, 0), scale=True)
 
-        self.display.add_button(action_value=2, adj=(0, 2), img_fn=self.pb.theme.get_file_name("photo_options"))
-        self.display.add_button(action_value=3, adj=(2, 2), img_fn=self.pb.theme.get_file_name("layout_options"))
-        self.display.add_button(action_value=1, adj=(1, 2), img_fn=self.pb.theme.get_file_name("button"))
-        self.display.apply()
+        self.pb.display.add_button(action_value=2, adj=(0, 2), img_fn=self.pb.theme.get_file_name("photo_options"))
+        self.pb.display.add_button(action_value=3, adj=(2, 2), img_fn=self.pb.theme.get_file_name("layout_options"))
+        self.pb.display.add_button(action_value=1, adj=(1, 2), img_fn=self.pb.theme.get_file_name("button"))
+        self.pb.display.apply()
 
     def set_example_img(self):
         self.example_img = self.pb.layout.assemble_pictures(self.example_img_raw * self.pb.layout.n_picture, (600,400))
@@ -377,7 +371,7 @@ class MainPage(DisplayPage):
 
 class ShootingPage(DisplayPage):
     def __init__(self, pb:Photobooth):
-        DisplayPage.__init__(self, "Shooting", pb.display, timer=2)
+        DisplayPage.__init__(self, "Shooting", pb, timer=2)
         #pb.cam.start_preview()
         #self.bg=pb.get_preview_frame()
         self.posing_timer=pb.pose_time
@@ -405,22 +399,22 @@ class ShootingPage(DisplayPage):
             while countdown > 0:
                 countdown = self.posing_timer - time() + t0
                 self.overlay_text=str(math.ceil(countdown))
-                self.display.show_picture(self.layout.apply_filters(self.prev_cam.get_preview_frame(), i), flip=True)
-                self.display.show_message(self.overlay_text)
-                self.display.apply()
-                r , event = self.display.check_for_event()
+                self.pb.display.show_picture(self.layout.apply_filters(self.prev_cam.get_preview_frame(), i), flip=True)
+                self.pb.display.show_message(self.overlay_text)
+                self.pb.display.apply()
+                r , event = self.pb.display.check_for_event()
                 if r:
                     self.handle_event(event) #no events defined but anyway
-            self.display.clear()
-            self.display.show_message("smile ;-)")
-            self.display.apply()
+            self.pb.display.clear()
+            self.pb.display.show_message("smile ;-)")
+            self.pb.display.apply()
             self.cam.take_picture(self.raw_filenames[i])
-            self.display.show_picture(self.layout.apply_filters(self.prev_cam.get_preview_frame(),i), flip=True)
+            self.pb.display.show_picture(self.layout.apply_filters(self.prev_cam.get_preview_frame(),i), flip=True)
 
         self.bg=None
         self.overlay_text="processing..."
         self.apply()
-        # self.cam.stop_preview_stream() todo: test does this crash 650D here??
+        self.cam.stop_preview_stream() # todo: test does this crash 650D here??
         raw_imgs=open_images(self.raw_filenames)
         result_img=self.layout.assemble_pictures(raw_imgs)
         result_img.save(self.result_filename)
@@ -435,14 +429,25 @@ class ResultPage(DisplayPage):
         else:
             self.file_name=pb.pictures.get(photo_idx)
         img=self.file_name
-        DisplayPage.__init__(self, "Results", pb.display, options=opt, timer=timer, bg=img)
+        DisplayPage.__init__(self, "Results", pb, options=opt, timer=timer, bg=img)
         self.start()
 
-    def delete_pic(self):
-        pass
+    def apply(self):
+        self.pb.display.clear()
+        if self.bg is not None:
+            self.pb.display.show_picture(self.bg, size=self.pb.display.get_size(), adj=(0,0))
+        if self.overlay_text is not None:
+            self.pb.display.show_message(self.overlay_text, size=self.overlay_text_size)
 
+        self.pb.display.add_button(action_value=3, adj=(2, 2), img_fn=self.pb.theme.get_file_name("printer"))
+        self.pb.display.add_button(action_value=2, adj=(0, 2), img_fn=self.pb.theme.get_file_name("trashbin"))
+        self.pb.display.apply()
+
+    def delete_pic(self):
+        self.pb.pictures.delete_pic()
+        self.next_action=self.pb.show_main()
     def print_pic(self):
-        pass
+        self.next_action = self.pb.show_main()
 
 
 #################

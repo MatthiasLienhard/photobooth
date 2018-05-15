@@ -397,6 +397,7 @@ class ShootingPage(DisplayPage):
 
     def take_pictures(self):
         self.next_action=self.next
+        self.pb.display.clear()
         for i in range(self.n_pictures):
             self.prev_cam.start_preview_stream()
             print("taking picture "+str(i))
@@ -405,21 +406,21 @@ class ShootingPage(DisplayPage):
             while countdown > 0:
                 countdown = self.posing_timer - time() + t0
                 self.overlay_text=str(math.ceil(countdown))
-                self.pb.display.show_picture(self.layout.apply_filters(self.prev_cam.get_preview_frame(), i), flip=True)
+                self.pb.display.show_picture(self.layout.apply_filters(self.prev_cam.get_preview_frame(), i), flip=True, size=self.pb.camera.preview_size, scale=True)
                 self.pb.display.show_message(self.overlay_text)
                 self.pb.display.apply()
                 r , event = self.pb.display.check_for_event()
                 if r:
                     self.handle_event(event) #no events defined but anyway
-            self.pb.camera.stop_preview_stream()
+            self.prev_cam.stop_preview_stream()
             self.pb.display.clear()
             self.pb.display.show_message("smile ;-)")
             self.pb.display.apply()
-            self.cam.take_picture(self.raw_filenames[i])
-            self.pb.display.show_picture(self.raw_filenames[i])
+            img=self.cam.take_picture(self.raw_filenames[i])
+            self.pb.display.show_picture(self.layout.apply_filters(img,i), flip=True)
             self.pb.display.apply()
             sleep(0.5)
-
+            self.pb.display.clear()
         self.bg=None
         self.overlay_text="processing..."
         self.apply()

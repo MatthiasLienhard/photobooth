@@ -71,8 +71,7 @@ class Camera:
         img=self.get_test_image(self.picture_size)
         if filename is not None:
             img.save(filename)
-        else:
-            return img
+        return img
 
     def set_idle(self):
         pass
@@ -160,11 +159,11 @@ class Camera_sonywifi(Camera):
     def get_preview_frame(self, filename=None):
         data = self.live_stream.get_latest_view()
         img = Image.open(io.BytesIO(data))
-        img=img.resize(self.preview_size, Image.ANTIALIAS)
-        if filename is None:
-            return (img)
-        else:
+        #img=img.resize(self.preview_size, Image.ANTIALIAS)
+        if filename is not None:
             img.save(filename)
+        return img
+
 
     def take_picture(self, filename="/tmp/picture.jpg"):
         options = self.camera.getAvailableApiList()['result'][0]
@@ -172,10 +171,10 @@ class Camera_sonywifi(Camera):
         print(url)
         response = requests.get(url['result'][0][0].replace('\\', ''))
         img=Image.open(io.BytesIO(response.content))
-        if filename is None:
-            return (img)
-        else:
+        if filename is not None:
             img.save(filename)
+        return img
+
 
 class Camera_cv(Camera):
     def __init__(self, picture_size, preview_size, zoom=30):
@@ -204,7 +203,7 @@ class Camera_cv(Camera):
             img = Image.fromarray(frame)
             if filter is not None:
                 img=filter.apply(img)
-            return(img)
+        return(img)
 
 class Camera_pi(Camera):
     def __init__(self, picture_size,preview_size, zoom =30):
@@ -261,11 +260,10 @@ class Camera_pi(Camera):
         img=Image.open(stream)
         if filter is not None:
             img = filter.apply(img)
-        if filename is None:
-            return(img)
-        else:
+        if filename is not None:
             img.save(filename)
-        # self.cam.capture(filename)
+        return img
+# self.cam.capture(filename)
 
 
 
@@ -297,10 +295,9 @@ class Camera_gPhoto(Camera):
         img = Image.open(io.BytesIO(data))
         if filter is not None:
             img = filter.apply(img)
-        if filename is None:
-            return(img)
-        else:
+        if filename is not None:
             img.save(filename)
+        return img
 
         # raise CameraException("No preview supported!")
 
@@ -309,10 +306,9 @@ class Camera_gPhoto(Camera):
         img=Image.open(io.BytesIO(img))
         if filter is not None:
             img = filter.apply(img)
-        if filename is None:
-            return(img)
-        else:
+        if filename is not None:
             img.save(filename)
+        return img
 
 
 

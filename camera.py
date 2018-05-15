@@ -107,6 +107,7 @@ class Camera_sonywifi(Camera):
             raise CameraException("Cannot connect to wifi")
         search = ControlPoint()
         cameras = search.discover()
+        self.last_preview_frame=Image.new('RGB', preview_size, (0,0,0) )
 
         if len(cameras):
             self.camera = SonyAPI(QX_ADDR=cameras[0])
@@ -146,7 +147,6 @@ class Camera_sonywifi(Camera):
     def stop_preview_stream(self):
         print("stopping preview")
         if self.live_stream is not None:
-            #self.live_stream.kill()
             self.live_stream.stop()
             options = self.camera.getAvailableApiList()['result'][0]
             #if self.preview_active and 'endRecMode' in (options):
@@ -157,11 +157,20 @@ class Camera_sonywifi(Camera):
 
 
     def get_preview_frame(self, filename=None):
-        data = self.live_stream.get_latest_view()
-        img = Image.open(io.BytesIO(data))
-        #img=img.resize(self.preview_size, Image.ANTIALIAS)
+        # read header, confirms image is also ready to read
+        header = self.live_stream.get_header()
+
+        if header:
+            #image_file = io.BytesIO(self.live_stream.get_latest_view())
+            #incoming_image = Image.open(image_file)
+            #frame_info = self.live_stream.get_frameinfo()
+            data = self.live_stream.get_latest_view()
+            img = Image.open(io.BytesIO(data))
+            #img=img.resize(self.preview_size, Image.ANTIALIAS)
+        else:
+            img=self.last_preview_frame
         if filename is not None:
-            img.save(filename)
+                img.save(filename)
         return img
 
 

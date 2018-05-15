@@ -15,7 +15,7 @@ try:
     #/home/matthias/projects/github/sony_camera_api/src")
     from pysony import SonyAPI, ControlPoint
     import requests
-
+    import NetworkManager
     sony_enabled = True
 except ImportError:
     sony_enabled=False
@@ -96,11 +96,11 @@ class Camera_sonywifi(Camera):
         self.live_stream = None
         if not sony_enabled:
             raise CameraException("pysony module not installed")
-        self.previous_wifi="yesman 1" #todo: get the current wifi NAME! not ssid eg with nmcli con show --active or iwgetid -r
+        self.previous_wifi="yesman" #todo: get the current wifi NAME! not ssid eg with nmcli con show --active or iwgetid -r
         self.sony_api_version="1.0"
         try:
             subprocess.check_call(["nmcli",  "con",  "up", "id", ssid])
-            # takes forever. only try to c
+            # takes forever. todo only try to connect if wifi is present
         except subprocess.CalledProcessError:
             raise CameraException("Cannot connect to wifi")
         search = ControlPoint()
@@ -330,7 +330,7 @@ class Camera_gPhoto(Camera):
         pass
         # todo define focus function
 
-def get_camera(picture_size, preview_size,priority_list=['sony_wifi', 'dslr', 'picam', 'webcam', 'dummicam'], default_cam=None):
+def get_camera(picture_size, preview_size,priority_list=['sony_wifi', 'dslr', 'picam', 'webcam'], default_cam=None):
 
     for type in priority_list:
         if default_cam is not None and default_cam.type is type:

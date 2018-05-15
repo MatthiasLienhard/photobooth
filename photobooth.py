@@ -355,6 +355,7 @@ class MainPage(DisplayPage):
         self.pb.display.add_button(action_value=2, adj=(0, 2), img_fn=self.pb.theme.get_file_name("filter_options"))
         self.pb.display.add_button(action_value=3, adj=(2, 2), img_fn=self.pb.theme.get_file_name("layout_options"))
         self.pb.display.add_button(action_value=1, adj=(1, 2), img_fn=self.pb.theme.get_file_name("button"))
+        self.pb.display.add_button(action_value=4, adj=(1, 0), img_fn=self.pb.theme.get_file_name("exit"))
         self.pb.display.apply()
 
     def set_example_img(self):
@@ -443,6 +444,7 @@ class ResultPage(DisplayPage):
 
         self.pb.display.add_button(action_value=3, adj=(2, 2), img_fn=self.pb.theme.get_file_name("printer"))
         self.pb.display.add_button(action_value=2, adj=(0, 2), img_fn=self.pb.theme.get_file_name("trashbin"))
+        self.pb.display.add_button(action_value=1, adj=(1, 2), img_fn=self.pb.theme.get_file_name("button_next"))
         self.pb.display.apply()
 
     def delete_pic(self):

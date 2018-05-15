@@ -20,6 +20,7 @@ from gui import GUI_PyGame as GuiModule
 # import numpy as np
 import random
 import sys
+import subprocess
 # import scipy.ndimage
 
 
@@ -108,13 +109,14 @@ class Photobooth:
     """
 
     def __init__(self, display_size, picture_basename, picture_size, preview_size,  pose_time, display_time,
-                 slideshow_display_time, theme="default", dslr_preview=False):
+                 slideshow_display_time, theme="default", printer_name="Canon_SELPHY_CP1300", dslr_preview=False):
         self.start_info_timer=5
         self.screensaver_timer=30
         self.slideshow_timer=slideshow_display_time
         self.display=None
         self.display_size=display_size
         #self.init_display()
+        self.printer_name=printer_name
 
         self.pictures     = PictureList(picture_basename)
         self.picture_dir  = os.path.realpath(self.pictures.dirname)
@@ -390,12 +392,13 @@ class ShootingPage(DisplayPage):
         self.raw_filenames=pic_list.get_raw(pic_list.counter, self.n_pictures)
         self.layout=pb.layout
         self.apply()
-        self.prev_cam.start_preview_stream()
+
         self.wait_for_event()
 
     def take_pictures(self):
         self.next_action=self.next
         for i in range(self.n_pictures):
+            self.prev_cam.start_preview_stream()
             print("taking picture "+str(i))
             t0=time()
             countdown=self.posing_timer
@@ -408,11 +411,14 @@ class ShootingPage(DisplayPage):
                 r , event = self.pb.display.check_for_event()
                 if r:
                     self.handle_event(event) #no events defined but anyway
+            self.pb.camera.stop_preview_stream()
             self.pb.display.clear()
             self.pb.display.show_message("smile ;-)")
             self.pb.display.apply()
             self.cam.take_picture(self.raw_filenames[i])
-            self.pb.display.show_picture(self.layout.apply_filters(self.prev_cam.get_preview_frame(),i), flip=True)
+            self.pb.display.show_picture(self.raw_filenames[i])
+            self.pb.display.apply()
+            sleep(0.5)
 
         self.bg=None
         self.overlay_text="processing..."
@@ -451,6 +457,12 @@ class ResultPage(DisplayPage):
         self.pb.pictures.delete_pic()
         self.next_action=self.pb.show_main()
     def print_pic(self):
+        #lpr filename.jpg -P Canon_SELPHY_CP1300
+        try:
+            subprocess.check_call(["lpr",  self.bg,  "-P", self.pb.printer_name])
+        except subprocess.CalledProcessError as e:
+            print(e)
+
         self.next_action = self.pb.show_main()
 
 
@@ -479,7 +491,6 @@ def main(fullscreen):
     photobooth = Photobooth(display_size, picture_basename, image_size, preview_size, pose_time, display_time,
                              slideshow_display_time)
     photobooth.run(fullscreen=fullscreen)
-    photobooth.teardown()
     return 0
 
 if __name__ == "__main__":

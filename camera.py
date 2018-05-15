@@ -11,11 +11,14 @@ import time
 import os
 try:
     import sys
-    sys.path.insert(0, os.path.dirname(os.getcwd())+"/sony_camera_api/src")
+
+    sony_path=os.path.dirname(os.path.dirname(__file__)) + "/sony_camera_api/src"
+    print(sony_path)
+    sys.path.insert(0, sony_path)
     #/home/matthias/projects/github/sony_camera_api/src")
     from pysony import SonyAPI, ControlPoint
     import requests
-    import NetworkManager
+    # import NetworkManager
     sony_enabled = True
 except ImportError:
     sony_enabled=False
@@ -146,32 +149,29 @@ class Camera_sonywifi(Camera):
         if self.live_stream is not None:
             #self.live_stream.kill()
             self.live_stream.stop()
-        options = self.camera.getAvailableApiList()['result'][0]
-        #if self.preview_active and 'endRecMode' in (options):
-        #     self.camera.stopRecMode()
-        #if self.live_stream.is_alive():
-        #    self.camera.stopLiveview() # todo:  is this correct?
+            options = self.camera.getAvailableApiList()['result'][0]
+            #if self.preview_active and 'endRecMode' in (options):
+            #    self.camera.stopRecMode()
+            #if self.live_stream.is_active():
+            #    self.camera.stopLiveview() # todo:  is this correct?
         self.preview_active = False
 
 
-    def get_preview_frame(self, filename=None, filter=None):
+    def get_preview_frame(self, filename=None):
         data = self.live_stream.get_latest_view()
         img = Image.open(io.BytesIO(data))
-        if filter is not None:
-            img = filter.apply(img)
+        img=img.resize(self.preview_size, Image.ANTIALIAS)
         if filename is None:
             return (img)
         else:
             img.save(filename)
 
-    def take_picture(self, filename="/tmp/picture.jpg", filter=None):
+    def take_picture(self, filename="/tmp/picture.jpg"):
         options = self.camera.getAvailableApiList()['result'][0]
         url = self.camera.actTakePicture()
         print(url)
         response = requests.get(url['result'][0][0].replace('\\', ''))
         img=Image.open(io.BytesIO(response.content))
-        if filter is not None:
-            img = filter.apply(img)
         if filename is None:
             return (img)
         else:

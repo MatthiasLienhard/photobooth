@@ -158,7 +158,9 @@ class Camera_sonywifi(Camera):
 
     def get_preview_frame(self, filename=None):
         # read header, confirms image is also ready to read
-        header = self.live_stream.get_header()
+        header=False
+        while not header:
+            header = self.live_stream.get_header()
 
         if header:
             #image_file = io.BytesIO(self.live_stream.get_latest_view())

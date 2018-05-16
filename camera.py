@@ -209,6 +209,7 @@ class Camera_cv(Camera):
         frame = cv2.resize( self.cam.read()[1], size)
         if filename is not None and filter is None:
             cv2.imwrite(filename, frame)
+            img = Image.fromarray(frame)
         else:
             frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
             img = Image.fromarray(frame)
@@ -337,7 +338,7 @@ class Camera_gPhoto(Camera):
         pass
         # todo define focus function
 
-def get_camera(picture_size, preview_size,priority_list=['sony_wifi', 'dslr', 'picam', 'webcam'], default_cam=None):
+def get_camera(picture_size, preview_size,priority_list=['webcam','sony_wifi', 'dslr', 'picam', 'webcam'], default_cam=None):
 
     for type in priority_list:
         if default_cam is not None and default_cam.type is type:

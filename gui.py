@@ -160,6 +160,7 @@ class GUI_PyGame:
             filename=image
             try:
                 # Load image from file
+                print("opening "+filename)
                 image = pygame.image.load(filename)
             except pygame.error as msg:
                 raise GuiException("ERROR: Can't open image '" + filename + "': " + str(msg))
@@ -172,11 +173,11 @@ class GUI_PyGame:
                     rgbimg.paste(image)
                     image=rgbimg
                     mode=image.mode
-                size = image.size
+
                 data = image.tobytes()
 
 
-                image = pygame.image.fromstring(data, size, mode)
+                image = pygame.image.fromstring(data, image.size, mode)
                 #image = pygame.image.frombuffer(image_buf, size, format="RGB")
             except pygame.error as msg:
                 raise GuiException("ERROR: Can't read image from buffer: " + msg)
@@ -184,7 +185,7 @@ class GUI_PyGame:
         if scale:
             # Extract image size and determine scaling
             image_size = image.get_rect().size
-            image_scale = min([min(a, b) / b for a, b in zip(size, image_size)])
+            image_scale = min(a / b for a, b in zip(size, image_size))
             # New image size
             new_size = [int(a * image_scale) for a in image_size]
             # Update offset
@@ -195,7 +196,7 @@ class GUI_PyGame:
             image = pygame.transform.scale(image, new_size).convert()
             size=new_size
         elif offset is None:
-            offset=self.get_offset(adj, size)
+            offset=self.get_offset(adj, image.get_rect().size)
         # Create surface and blit the image to it
         surface = pygame.Surface(size)
         surface.blit(image, (0, 0))

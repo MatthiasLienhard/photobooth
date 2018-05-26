@@ -207,6 +207,7 @@ class Camera_cv(Camera):
 
     def _take_picture(self, filename, filter, size):
         frame = cv2.resize( self.cam.read()[1], size)
+        #frame = self.cam.read()[1]
         if filename is not None and filter is None:
             cv2.imwrite(filename, frame)
             img = Image.fromarray(frame)

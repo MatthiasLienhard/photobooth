@@ -349,10 +349,10 @@ class MainPage(DisplayPage):
 
     def apply(self):
         self.pb.display.clear()
-        self.pb.display.show_picture(self.pb.theme.get_file_name("mainpage"))
-        #self.display.show_picture(self.theme.get_file_name("title"), adj=(2,0), scale=True)
+        self.pb.display.show_picture(self.pb.theme.get_file_name("mainpage"), scale=True)
+        #self.pb.display.show_picture(self.pb.theme.get_file_name("title"), adj=(2,0), scale=True)
 
-        self.pb.display.show_picture(self.example_img, adj=(1, 0), scale=True)
+        self.pb.display.show_picture(self.example_img, adj=(1, 0), scale=False)
 
         self.pb.display.add_button(action_value=2, adj=(0, 2), img_fn=self.pb.theme.get_file_name("filter_options"))
         self.pb.display.add_button(action_value=3, adj=(2, 2), img_fn=self.pb.theme.get_file_name("layout_options"))
@@ -400,13 +400,13 @@ class ShootingPage(DisplayPage):
         self.pb.display.clear()
         for i in range(self.n_pictures):
             self.prev_cam.start_preview_stream()
-            print("taking picture "+str(i))
+            print("taking picture {}/{}".format(i+1, self.n_pictures))
             t0=time()
             countdown=self.posing_timer
             while countdown > 0:
                 countdown = self.posing_timer - time() + t0
                 self.overlay_text=str(math.ceil(countdown))
-                self.pb.display.show_picture(self.layout.apply_filters(self.prev_cam.get_preview_frame(), i), flip=True, size=self.pb.camera.preview_size, scale=True)
+                self.pb.display.show_picture(self.layout.apply_filters(self.prev_cam.get_preview_frame(), i), flip=True, scale=True)
                 self.pb.display.show_message(self.overlay_text)
                 self.pb.display.apply()
                 r , event = self.pb.display.check_for_event()
@@ -417,7 +417,7 @@ class ShootingPage(DisplayPage):
             self.pb.display.show_message("smile ;-)")
             self.pb.display.apply()
             img=self.cam.take_picture(self.raw_filenames[i])
-            self.pb.display.show_picture(self.layout.apply_filters(img,i), flip=True)
+            self.pb.display.show_picture(self.layout.apply_filters(img,i), flip=True, scale=True)
             self.pb.display.apply()
             sleep(0.5)
             self.pb.display.clear()

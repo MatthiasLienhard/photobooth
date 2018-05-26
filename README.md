@@ -2,13 +2,14 @@
 This is yet another photobooth application written in python3 using a Raspberry Pi, gPhoto2 and pygame.
 
 It's intended to run on raspberry pi 3 with following devices connected:
-* DSLR cam (Canon 650D)
+* Sony Cam accessed via wifi api
 * touchscreen (Waveshare 7" HDMI 1024*600 Rev2.1)
-* big red pushbutton
+* big red pushbutton (not added yet)
 * printer (Canon selphy cp1300)
+* wooden case
 
-## (planed) features
-* supported camera types: gphoto2 (e.g. DLSR), openCV capture (webcam), picamera for raspberry pi
+## features
+* supported camera types: Sony wifi api, gphoto2 (e.g. DLSR), openCV capture (webcam), picamera for raspberry pi
 * idle state: slideshow of today's pictures
 * controlled touchscreen and optional GPIO button - or keyboard (mainly for testing)
 * different layouts (e.g. how pictures are arranged)
@@ -21,9 +22,12 @@ It's intended to run on raspberry pi 3 with following devices connected:
 
 Ideas for features
 * Transfer picture to smartphone (e.g. with bluetooth)
+* Add effects: sephia, rainbowify
+* Add layouts 
+* Add banner / other theme elements in layout
 
 ## usage
-python3 photobooth.py [theme]
+python3 photobooth.py [theme] [--fullscreen]
 
 ## Issues
 DSLRs (at least the 650D) can not (hardly) focus during preview.
@@ -34,12 +38,16 @@ DSLRs (at least the 650D) can not (hardly) focus during preview.
         * manually focus (without preview) 1 second before picture is taken
         * continue preview
         * take picture without refocusing
-    * use picamera for preview
+    * use additional camera (e.g. picamera) for preview
         * placed next to main camera
         * placed in optical viewfinder
             * results in poor image quality
-    * use other cam (no DSLR)
-Switching preview on and off takes 2 seconds
+    * use other cam (no DSLR, the mirrorless Sony alpha 6000 does not have issues with focus)
+    * Switching preview on and off takes 2 seconds
+## prequirements
+* patched sony api (see my git sony_camera_api)
+* usage of sony cam depends on network manager (which is not default on raspberrypi)
+
 
 
 

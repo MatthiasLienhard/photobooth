@@ -22,7 +22,12 @@ import random
 import sys
 import subprocess
 # import scipy.ndimage
-
+try:
+    import cups
+    _has_cups=True
+except ImportError:
+    _has_cups=False
+    print("for printer support, install pycups")
 
 class PhotoboothException(Exception):
     """Custom exception class to handle camera class errors"""
@@ -109,14 +114,23 @@ class Photobooth:
     """
 
     def __init__(self, display_size, picture_basename, picture_size, preview_size,  pose_time, display_time,
-                 slideshow_display_time, theme="default", printer_name="Canon_SELPHY_CP1300", dslr_preview=False):
+                 slideshow_display_time, printer_name=None, theme="default"):
         self.start_info_timer=5
         self.screensaver_timer=30
         self.slideshow_timer=slideshow_display_time
         self.display=None
         self.display_size=display_size
         #self.init_display()
-        self.printer_name=printer_name
+        if _has_cups:
+            self.cups_conn=cups.Connection()
+            printers=self.cups_conn.getPrinters()
+            if printer_name is not None and printer_name in printers.keys():
+                self.printer=printer_name
+                print("found specified printer "+printer_name)
+            else:
+                self.printer=None
+        else:
+            self.printer=None
 
         self.pictures     = PictureList(picture_basename)
         self.picture_dir  = os.path.realpath(self.pictures.dirname)
@@ -199,9 +213,11 @@ class Photobooth:
             info += " and "+ self.preview_camera.type
         return info
 
+
+
     def get_info_text(self):
         # todo: make infotext
-        return("Camera: "+self.camera_info()+"\n\n"+self.pictures.get_info())
+        return("Camera: "+self.camera_info()+"\n\n"+self.pictures.get_info()+"\n\nprinter: "+self.printer)
 
 #####################
 ### Display Pages ###
@@ -439,6 +455,14 @@ class ResultPage(DisplayPage):
         else:
             self.file_name=pb.pictures.get(photo_idx)
         img=self.file_name
+        self.printer_ready=False
+        if pb.printer is not None:
+            attr=pb.cups_conn.getPrinterAttributes(pb.printer)
+            # todo: more states that should disable printing?
+            if attr['printer-state-message'] != 'Unplugged or turned off':
+                self.printer_ready=True
+                # print(attr['printer-state-message'])
+
         DisplayPage.__init__(self, "Results", pb, options=opt, timer=timer, bg=img)
         self.start()
 
@@ -448,22 +472,34 @@ class ResultPage(DisplayPage):
             self.pb.display.show_picture(self.bg, size=self.pb.display.get_size(), adj=(0,0))
         if self.overlay_text is not None:
             self.pb.display.show_message(self.overlay_text, size=self.overlay_text_size)
-
-        self.pb.display.add_button(action_value=3, adj=(2, 2), img_fn=self.pb.theme.get_file_name("printer"))
+        if self.printer_ready:
+            self.pb.display.add_button(action_value=3, adj=(2, 2), img_fn=self.pb.theme.get_file_name("printer"))
         self.pb.display.add_button(action_value=2, adj=(0, 2), img_fn=self.pb.theme.get_file_name("trashbin"))
         self.pb.display.add_button(action_value=1, adj=(1, 2), img_fn=self.pb.theme.get_file_name("button_next"))
         self.pb.display.apply()
 
     def delete_pic(self):
+        print("delete")
         self.pb.pictures.delete_pic()
-        self.next_action=self.pb.show_main()
+
+        self.pb.display.show_message("delete picture")
+        self.pb.display.apply()
+        sleep(2)
+        self.next_action = self.pb.show_main()
     def print_pic(self):
         #lpr filename.jpg -P Canon_SELPHY_CP1300
+        #try:
+        #    subprocess.check_call(["lpr",  self.bg,  "-P", self.pb.printer])
+        #except subprocess.CalledProcessError as e:
+        #    print(e)
         try:
-            subprocess.check_call(["lpr",  self.bg,  "-P", self.pb.printer_name])
-        except subprocess.CalledProcessError as e:
-            print(e)
+            self.pb.cups_conn.printFile(self.pb.printer_name, self.bg, " ", {})
+        except:
+            raise #todo: what can go wrong here?
 
+        self.pb.display.show_message("start printing...")
+        self.pb.display.apply()
+        sleep(2)
         self.next_action = self.pb.show_main()
 
 
@@ -488,9 +524,10 @@ def main(fullscreen):
 
     # Display time of pictures in the slideshow
     slideshow_display_time = 5
+    printer='Canon-SELPHY-CP1300'
 
     photobooth = Photobooth(display_size, picture_basename, image_size, preview_size, pose_time, display_time,
-                             slideshow_display_time)
+                             slideshow_display_time, printer_name=printer)
     photobooth.run(fullscreen=fullscreen)
     return 0
 

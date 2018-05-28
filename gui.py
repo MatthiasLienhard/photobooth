@@ -22,11 +22,12 @@ class GuiException(Exception):
     """Custom exception class to handle GUI class errors"""
 
 class Button_PyGame:
-    def __init__(self, parent, action_value,adj=None, pos=None,size=None, img_fn=None,  text=None, font_color=(0,0,0),font_size=72,  color=None, frame_color=None):
+    def __init__(self, surface_idx, parent, action_value,adj=None, pos=None,size=None, img_fn=None,  text=None, font_color=(0,0,0),font_size=72,  color=None, frame_color=None):
         self.text=text
         self.font_size=font_size
         self.font_color=font_color
         self.action_value=action_value
+        self.surface_idx=surface_idx
         if img_fn is None and size is None:
             raise ValueError("specify either size or img")
         if img_fn is not None:
@@ -50,35 +51,43 @@ class Button_PyGame:
         self.color=color
         self.frame_color=frame_color
         self.screen_size=parent.size
+        self.down=False
 
     def get_surface(self):
-        # Create Surface object and fill it with the given background
         surface = pygame.Surface(self.screen_size, pygame.SRCALPHA)
-        #surface.fill((0,0,0,255))
+        pos=list(self.pos)
+        if self.down:
+            pos[1]+=self.screen_size[1]/30
         if self.img is not None:
-            surface.blit(self.img, self.pos)
+            surface.blit(self.img, pos)
 
         if self.text is not None:
             font = pygame.font.Font(None, self.font_size)
             text_size = font.size(self.text)
-            text_pos=(self.pos[0] + (self.size[0] - text_size[0]) // 2,
-                      self.pos[1] + (self.size[1] - text_size[1]) // 2)
+            text_pos=(pos[0] + (self.size[0] - text_size[0]) // 2,
+                      pos[1] + (self.size[1] - text_size[1]) // 2)
             rendered_text = font.render(self.text, 1, self.font_color)
             surface.blit(rendered_text, text_pos)
 
         if self.frame_color is not None:
             # Render outline
-            pygame.draw.rect(surface, self.frame_color, (self.pos[0] , self.pos[1] , self.size[0],self.size[1]), 1)
-
-        # Make background color transparent
-        #surface.set_colorkey(bg)
+            pygame.draw.rect(surface, self.frame_color, (pos[0] , pos[1] , self.size[0],self.size[1]), 1)
         return(surface, (0,0))
 
-    def handle_click(self, pos):
+    def handle_click(self, pos, down=False):
+        if not down:
+            self.down=False
         if pos[0]>=self.pos[0] and pos[0] <= self.pos[0]+self.size[0] \
             and pos[1] >= self.pos[1] and pos[1] <= self.pos[1] + self.size[1]:
-            print("button {} pressed!".format(self.action_value))
-            pygame.event.post(pygame.event.Event(BUTTONEVENT, action=self.action_value))
+            if down:
+                print("button {} pressed!".format(self.action_value))
+                self.down=True
+            else:
+                print("button {} released!".format(self.action_value))
+                pygame.event.post(pygame.event.Event(BUTTONEVENT, action=self.action_value))
+            return True
+        return False
+
 
 
 
@@ -116,7 +125,7 @@ class GUI_PyGame:
         self.buttons = []
 
         # Clear screen
-        self.clear()
+        self.clear( )
         self.apply()
 
     def get_offset( self,adj,item_size):
@@ -135,10 +144,12 @@ class GUI_PyGame:
         self.surface_list = []
         self.buttons=[]
 
-    def apply(self):
+    def apply(self, bg=(0, 0, 0)):
+        self.screen.fill(bg)
         for surface in self.surface_list:
             self.screen.blit(surface[0], surface[1])
         pygame.display.update()
+
     def get_size(self):
         return self.size
 
@@ -214,10 +225,20 @@ class GUI_PyGame:
         self.surface_list.append((rendered_text, (0, 0)))
 
 
-    def add_button(self, *args, **kwargs):
-        self.buttons.append(Button_PyGame(self,*args, **kwargs))
+    def add_button(self, **kwargs):
+        self.buttons.append(Button_PyGame(parent=self, surface_idx=len(self.surface_list),  **kwargs))
         self.surface_list.append(self.buttons[-1].get_surface())
 
+    def release_buttons(self):
+        release = []
+        for i, b in enumerate(self.buttons):
+            if b.down:
+                b.down = False
+                release.append(i)
+        for i in release:
+            self.surface_list[self.buttons[i].surface_idx] = self.buttons[i].get_surface()
+        if release:
+            self.apply()
 
     def wrap_text(self, msg, font, size):
         final_lines = []  # resulting wrapped text
@@ -310,9 +331,11 @@ class GUI_PyGame:
         # Make background color transparent
         if transparency:
             surface.set_colorkey(bg)
-
         # Return the rendered surface
         return surface
+
+
+
 
     def convert_event(self, event):
         if event.type == pygame.QUIT:
@@ -327,7 +350,19 @@ class GUI_PyGame:
         elif event.type == BUTTONEVENT: #button event
             print("Button {} clicked".format(event.action))
             return True, events.Event(2,event.action)
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            pressed=[]
+            for i, b in enumerate(self.buttons):
+                if b.handle_click(event.pos, down=True):
+                    pressed.append(i)
+            for i in pressed:
+                self.surface_list[self.buttons[i].surface_idx] = self.buttons[i].get_surface()
+            if pressed:
+                self.apply()
+
+
         elif event.type == pygame.MOUSEBUTTONUP:
+            self.release_buttons()
             for b in self.buttons:
                 b.handle_click(event.pos)
             #return True, events.Event(2, (event.button, event.pos))

@@ -124,6 +124,7 @@ class Photobooth:
         if _has_cups:
             self.cups_conn=cups.Connection()
             printers=self.cups_conn.getPrinters()
+            print("found printers: "+",".join(printers.keys()))
             if printer_name is not None and printer_name in printers.keys():
                 self.printer=printer_name
                 print("found specified printer "+printer_name)
@@ -216,8 +217,8 @@ class Photobooth:
 
 
     def get_info_text(self):
-        # todo: make infotext
-        return("Camera: "+self.camera_info()+"\n\n"+self.pictures.get_info()+"\n\nprinter: "+self.printer)
+        # todo: make better infotext
+        return("Camera: {}\n\n{}\n\nprinter: {}".format(self.camera_info(),self.pictures.get_info(),self.printer))
 
 #####################
 ### Display Pages ###

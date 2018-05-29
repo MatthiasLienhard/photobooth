@@ -130,6 +130,7 @@ class Photobooth:
                 print("found specified printer "+printer_name)
             else:
                 self.printer=None
+                if printer_name is not None: print(printer_name +" not found")
         else:
             self.printer=None
 

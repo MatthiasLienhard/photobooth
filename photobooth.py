@@ -533,7 +533,7 @@ def main(fullscreen):
 
     # Display time of pictures in the slideshow
     slideshow_display_time = 5
-    printer='Canon-SELPHY-CP1300'
+    printer='Canon_SELPHY_CP1300'
 
     photobooth = Photobooth(display_size, picture_basename, image_size, preview_size, pose_time, display_time,
                              slideshow_display_time, printer_name=printer)

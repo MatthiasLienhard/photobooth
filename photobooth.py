@@ -421,15 +421,21 @@ class ShootingPage(DisplayPage):
             print("taking picture {}/{}".format(i+1, self.n_pictures))
             t0=time()
             countdown=self.posing_timer
+            frameC=0
             while countdown > 0:
+                frameC+=1
                 countdown = self.posing_timer - time() + t0
                 self.overlay_text=str(math.ceil(countdown))
-                self.pb.display.show_picture(self.layout.apply_filters(self.prev_cam.get_preview_frame(), i), flip=True, scale=True)
+                img=self.layout.apply_filters(self.prev_cam.get_preview_frame(), i)
+                self.pb.display.show_picture(img, flip=True, scale=True)
+                #self.pb.display.show_picture(self.prev_cam.get_preview_frame(), flip=True,  scale=True)
                 self.pb.display.show_message(self.overlay_text)
                 self.pb.display.apply()
+
                 r , event = self.pb.display.check_for_event()
                 if r:
                     self.handle_event(event) #no events defined but anyway
+            print("preview framerate: {} fps".format(frameC/(time()-t0)))
             self.prev_cam.stop_preview_stream()
             self.pb.display.clear()
             self.pb.display.show_message("smile ;-)")
@@ -461,9 +467,10 @@ class ResultPage(DisplayPage):
         if pb.printer is not None:
             attr=pb.cups_conn.getPrinterAttributes(pb.printer)
             # todo: more states that should disable printing?
+            print("printer state: "+ attr['printer-state-message'])
             if attr['printer-state-message'] != 'Unplugged or turned off':
                 self.printer_ready=True
-                # print(attr['printer-state-message'])
+
 
         DisplayPage.__init__(self, "Results", pb, options=opt, timer=timer, bg=img)
         self.start()
@@ -495,7 +502,7 @@ class ResultPage(DisplayPage):
         #except subprocess.CalledProcessError as e:
         #    print(e)
         try:
-            self.pb.cups_conn.printFile(self.pb.printer_name, self.bg, " ", {})
+            self.pb.cups_conn.printFile(self.pb.printer, self.bg, " ", {})
         except:
             raise #todo: what can go wrong here?
 

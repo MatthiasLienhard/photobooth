@@ -81,7 +81,7 @@ class HighContrastMonochrome(ImageFilter):
 class Rainbowify(ImageFilter):
     # inspired by Jonathan Frech, jfrech.com/jblog/post180/rainbowify.py
     def __init__(self, width=20):
-        ImageFilter.__init__(self,"HighContrastMonochrome")
+        ImageFilter.__init__(self,"Rainbowify")
         self.width=width
 
     def apply(self, img):
@@ -126,18 +126,26 @@ class Rainbowify(ImageFilter):
 
 
 class Sepia(ImageFilter):
-    def __init__(self, contrast=100, sepia=(255, 240, 192)):
-        ImageFilter.__init__(self,"HighContrastMonochrome")
-        self.contrast=contrast
-        self.sepia=sepia
+    def __init__(self):#, contrast=100, sepia=(255, 240, 192)):
+        ImageFilter.__init__(self,"Sepia")
+        #self.contrast=contrast
+        #self.sepia=sepia
 
     def apply(self,img): #set b/w and increase contrast
-        img=self.monochrome(img)
-        img=self.change_contrast(img,self.contrast)
-        r,g,b=self.sepia
-        sepia_palette=np.array([ [r*i//255, g*i//255, b*i//255] for i in range(255) ]).flatten().tolist()
-        img.putpalette(sepia_palette)
-        return(img)
+        #img=self.monochrome(img)
+        #img=self.change_contrast(img,self.contrast)
+        #r,g,b=self.sepia
+        #sepia_palette=np.array([ [r*i//255, g*i//255, b*i//255] for i in range(255) ]).flatten().tolist()
+        #img.putpalette(sepia_palette)
+        #return (img)
+        pixels=np.array(img)
+        # https://www.dyclassroom.com/image-processing-project/how-to-convert-a-color-image-into-sepia-image
+        r = np.expand_dims(np.sum(pixels * [0.393, 0.769, 0.189], axis=2), 2)
+        g = np.expand_dims(np.sum(pixels * [0.349, 0.686, 0.168], axis=2), 2)
+        b = np.expand_dims(np.sum(pixels * [0.272, 0.534, 0.131], axis=2), 2)
+        pixels=np.concatenate([r, g, b], axis=2)
+        pixels[pixels>255]=255
+        return Image.fromarray(pixels.astype('uint8'), 'RGB')
 
 
 class WarholCheGuevaraSerigraph(ImageFilter):
@@ -159,7 +167,7 @@ class WarholCheGuevaraSerigraph(ImageFilter):
         self.idx = idx % 9
         ImageFilter.__init__(self, "WarholCheGuevaraSerigraph_"+str(self.idx))
         # self.face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
-        self.fgbg=cv2.BackgroundSubtractorMOG2()
+        # self.fgbg=cv2.BackgroundSubtractorMOG2()
 
     def apply(self,img):
 
@@ -176,6 +184,15 @@ class WarholCheGuevaraSerigraph(ImageFilter):
 
 
 
-#"projects/github/photobooth/2018-04-14/photobooth_2018-04-14_00001.jpg"
+if __name__ == "__main__":
 
-#img=Image.open(fn)
+
+    fn="2018-05-26/raw/photobooth_2018-05-26_00001_1.jpg"
+
+    img=Image.open(fn)
+    img=img.resize([450,300], Image.ANTIALIAS)
+
+    #img.show()
+    filter=Sepia()
+    sepia=filter.apply(img)
+    sepia.show()

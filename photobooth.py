@@ -145,6 +145,7 @@ class Photobooth:
         self.set_layout()
         self.errors=[]
         self.current_page=None
+
         self.camera = camera.get_camera(picture_size, preview_size)
         # self.preview_camera=camera.get_camera(picture_size, preview_size,['picam', 'webcam', 'dslr','dummicam'], self.camera)
         self.preview_camera=camera.get_camera(picture_size, preview_size,default_cam=self.camera)
@@ -209,6 +210,13 @@ class Photobooth:
         self.current_page=ResultPage(self)
     def show_error(self):
         self.current_page = ErrorPage(self)
+    def show_settings(self):
+        self.current_page = SettingsPage(self)
+    def show_layout(self):
+        self.current_page = LayoutPage(self)
+    def show_filter(self):
+        self.current_page = FilterPage(self)
+
     def camera_info(self):
         info=self.camera.type
         if self.preview_camera != self.camera:
@@ -359,7 +367,7 @@ class MainPage(DisplayPage):
         DisplayPage.__init__(self, "Main", pb)
         self.timer=pb.screensaver_timer
         self.options=[pb.show_slideshow,pb.show_shooting, pb.toggle_filter, pb.toggle_layout,
-             pb.teardown] #todo: add camera opt
+             pb.show_settings] #todo: add camera opt
         self.overlay_text="Main Menue"
         self.example_img_raw = open_images([self.pb.theme.get_file_name("test_picture", ".jpg")])
         self.set_example_img()
@@ -375,7 +383,7 @@ class MainPage(DisplayPage):
         self.pb.display.add_button(action_value=2, adj=(0, 2), img_fn=self.pb.theme.get_file_name("filter_options"))
         self.pb.display.add_button(action_value=3, adj=(2, 2), img_fn=self.pb.theme.get_file_name("layout_options"))
         self.pb.display.add_button(action_value=1, adj=(1, 2), img_fn=self.pb.theme.get_file_name("button"))
-        self.pb.display.add_button(action_value=4, adj=(1, 0), img_fn=self.pb.theme.get_file_name("exit"))
+        self.pb.display.add_button(action_value=4, adj=(1, 0), img_fn=self.pb.theme.get_file_name("settings"))
         self.pb.display.apply()
 
     def set_example_img(self):
@@ -463,6 +471,8 @@ class ResultPage(DisplayPage):
         else:
             self.file_name=pb.pictures.get(photo_idx)
         img=self.file_name
+
+        DisplayPage.__init__(self, "Results", pb, options=opt, timer=timer, bg=img)
         self.printer_ready=False
         if pb.printer is not None:
             attr=pb.cups_conn.getPrinterAttributes(pb.printer)
@@ -472,7 +482,6 @@ class ResultPage(DisplayPage):
                 self.printer_ready=True
 
 
-        DisplayPage.__init__(self, "Results", pb, options=opt, timer=timer, bg=img)
         self.start()
 
     def apply(self):
@@ -503,13 +512,68 @@ class ResultPage(DisplayPage):
         #    print(e)
         try:
             self.pb.cups_conn.printFile(self.pb.printer, self.bg, " ", {})
+
         except:
             raise #todo: what can go wrong here?
 
-        self.pb.display.show_message("start printing...")
+        sleep(.1)
+
+
+        attr=self.pb.cups_conn.getPrinterAttributes(self.pb.printer)
+        self.pb.display.show_message("start printing...\n"+attr['printer-state-message'])
         self.pb.display.apply()
         sleep(2)
         self.next_action = self.pb.show_main()
+
+class SettingsPage(DisplayPage):
+    def __init__(self, pb):
+        options=[pb.show_main, pb.show_main, pb.show_layout, pb.show_filter, self.zoom_out, self.zoom_in, self.next_theme, self.prev_theme, self.del_printjobs ]
+        DisplayPage.__init__(self, "Settings", pb,options,pb.start_info_timer)
+        self.themes=os.listdir('themes')
+        self.theme_idx=self.themes.index(self.pb.theme.name)
+        self.start()
+
+
+    def apply(self):
+        center=self.pb.display_size[0]/2
+        self.pb.display.clear()
+        self.pb.display.show_message("Settings", size=72, halign=1, valign=0)
+        self.pb.display.add_button(action_value=1, adj=(2, 2), img_fn=self.pb.theme.get_file_name("return"))
+        self.pb.display.add_button(action_value=2, pos=(center, 72*1), img_fn=self.pb.theme.get_file_name("layout_options"))
+        self.pb.display.add_button(action_value=3, pos=(center, 72*2), img_fn=self.pb.theme.get_file_name("filter_options"))
+        self.pb.display.add_button(action_value=4, pos=(center-100, 72*3), img_fn=self.pb.theme.get_file_name("left_button"))
+        self.pb.display.add_button(action_value=5, pos=(center+100, 72*3), img_fn=self.pb.theme.get_file_name("right_button"))
+        self.pb.display.add_button(action_value=6, pos=(center-100, 72*4), img_fn=self.pb.theme.get_file_name("left_button"))
+        self.pb.display.add_button(action_value=7, pos=(center+100, 72*4), img_fn=self.pb.theme.get_file_name("right_button"))
+        self.pb.display.apply()
+
+    def zoom_out(self):
+        focal_len=self.pb.camera.get_zoom()
+        self.pb.camera.zoom(focal_len - 1 )
+        self.next_action = self.pb.show_settings()
+
+    def zoom_in(self):
+        focal_len=self.pb.camera.get_zoom()
+        self.pb.camera.zoom(focal_len + 1 )
+        self.next_action = self.pb.show_settings()
+
+    def next_theme(self):
+        self.theme_idx+=1
+        if self.theme_idx >= len(self.themes):
+            self.theme_idx=0
+        self.theme = Theme(self.themes[self.theme_idx])
+        self.next_action = self.pb.show_settings()
+
+    def prev_theme(self):
+        self.theme_idx-=1
+        if self.theme_idx < 0:
+            self.theme_idx=len(self.themes)-1
+        self.theme = Theme(self.themes[self.theme_idx])
+        self.next_action = self.pb.show_settings()
+
+    def del_printjobs(self):
+        print("TODO: implement reset of printing queue")
+        self.next_action = self.pb.show_settings()
 
 
 #################

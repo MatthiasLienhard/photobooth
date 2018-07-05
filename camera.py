@@ -48,7 +48,7 @@ class CameraException(Exception):
         self.recoverable = recoverable
 
 class Camera:
-    def __init__(self, picture_size,preview_size, focal_length=30, type="dummicam",name='dummicam' ):
+    def __init__(self, picture_size,preview_size, focal_length='NA', type="dummicam",name='dummicam' ):
         self.picture_size = picture_size
         self.focal_length = focal_length
         self.preview_size=preview_size
@@ -120,12 +120,13 @@ class Camera_sonywifi(Camera):
         self.teardown()
 
     def teardown(self):
-        if self.live_stream is not None:
-            self.stop_preview_stream()
-        try:
-            subprocess.check_call(["nmcli", "con", "up", "id", self.previous_wifi])
-        except subprocess.CalledProcessError:
-            raise CameraException("Cannot connect to previous wifi " + self.previous_wifi)
+        if sony_enabled:
+            if self.live_stream is not None:
+                self.stop_preview_stream()
+            try:
+                subprocess.check_call(["nmcli", "con", "up", "id", self.previous_wifi])
+            except subprocess.CalledProcessError:
+                raise CameraException("Cannot connect to previous wifi " + self.previous_wifi)
 
     def start_preview_stream(self):
         # For those cameras which need it
@@ -284,6 +285,8 @@ class Camera_gPhoto(Camera):
     """Camera class providing functionality to take pictures using gPhoto 2"""
 
     def __init__(self, picture_size, preview_size, zoom=30):
+        if not gphoto_enabled:
+            raise CameraException("No gphoto module")
         Camera.__init__(self,picture_size, preview_size, zoom, type='dslr')
         # Print the capabilities of the connected camera
         try:
@@ -339,8 +342,7 @@ class Camera_gPhoto(Camera):
         pass
         # todo define focus function
 
-def get_camera(picture_size, preview_size,priority_list=['webcam','sony_wifi', 'dslr', 'picam', 'webcam'], default_cam=None):
-
+def get_camera(picture_size, preview_size,priority_list=['webcam','sony_wifi', 'dslr', 'picam', 'webcam', 'dummicam'], default_cam=None):
     for type in priority_list:
         if default_cam is not None and default_cam.type is type:
             return default_cam
@@ -350,6 +352,7 @@ def get_camera(picture_size, preview_size,priority_list=['webcam','sony_wifi', '
                 return cam
 
 def _get_camera(picture_size, preview_size, type):
+    print("try to get camera of type "+type)
     if type=='sony_wifi':
         try:
             return Camera_sonywifi(picture_size, preview_size)

@@ -528,7 +528,7 @@ class ResultPage(DisplayPage):
 class SettingsPage(DisplayPage):
     def __init__(self, pb):
         options=[pb.show_main, pb.show_main, pb.show_layout, pb.show_filter, self.zoom_out, self.zoom_in, self.next_theme, self.prev_theme, self.del_printjobs ]
-        DisplayPage.__init__(self, "Settings", pb,options,pb.start_info_timer)
+        DisplayPage.__init__(self, "Settings", pb,options, pb.screensaver_timer)
         self.themes=os.listdir('themes')
         self.theme_idx=self.themes.index(self.pb.theme.name)
         self.start()
@@ -536,15 +536,18 @@ class SettingsPage(DisplayPage):
 
     def apply(self):
         center=self.pb.display_size[0]/2
+        #row_hight=round((self.pb.display_size[1])/6)
+        rh=100
         self.pb.display.clear()
         self.pb.display.show_message("Settings", size=72, halign=1, valign=0)
         self.pb.display.add_button(action_value=1, adj=(2, 2), img_fn=self.pb.theme.get_file_name("return"))
-        self.pb.display.add_button(action_value=2, pos=(center, 72*1), img_fn=self.pb.theme.get_file_name("layout_options"))
-        self.pb.display.add_button(action_value=3, pos=(center, 72*2), img_fn=self.pb.theme.get_file_name("filter_options"))
-        self.pb.display.add_button(action_value=4, pos=(center-100, 72*3), img_fn=self.pb.theme.get_file_name("left_button"))
-        self.pb.display.add_button(action_value=5, pos=(center+100, 72*3), img_fn=self.pb.theme.get_file_name("right_button"))
-        self.pb.display.add_button(action_value=6, pos=(center-100, 72*4), img_fn=self.pb.theme.get_file_name("left_button"))
-        self.pb.display.add_button(action_value=7, pos=(center+100, 72*4), img_fn=self.pb.theme.get_file_name("right_button"))
+        self.pb.display.add_button(action_value=2, pos=(center, rh*1+rh//2),size=[300, rh*9//10], img_fn=self.pb.theme.get_file_name("layout_options"))
+        self.pb.display.add_button(action_value=3, pos=(center, rh*2+rh//2),size=[300, rh*9//10], img_fn=self.pb.theme.get_file_name("filter_options"))
+        self.pb.display.add_button(action_value=4, pos=(center-200, rh*3+rh//2),size=[rh*3//4,rh*3//4], img_fn=self.pb.theme.get_file_name("left_button"))
+        self.pb.display.add_button(action_value=5, pos=(center+200, rh*3+rh//2),size=[rh*3//4,rh*3//4], img_fn=self.pb.theme.get_file_name("right_button"))
+        self.pb.display.add_button(action_value=6, pos=(center-200, rh*4+rh//2),size=[rh*3//4,rh*3//4], img_fn=self.pb.theme.get_file_name("left_button"))
+        self.pb.display.add_button(action_value=7, pos=(center+200, rh*4+rh//2),size=[rh*3//4,rh*3//4], img_fn=self.pb.theme.get_file_name("right_button"))
+        self.pb.display.add_button(action_value=8, pos=(center, rh*5+rh//2),size=[300, rh*9//10], img_fn=self.pb.theme.get_file_name("filter_options"))
         self.pb.display.apply()
 
     def zoom_out(self):

@@ -38,7 +38,7 @@ class Button_PyGame:
         if size is None:
             size=img.get_rect().size
         elif img is not None:
-            pygame.transform.scale(img, size).convert()
+            img=pygame.transform.scale(img, size).convert_alpha()
 
         if adj is None and pos is None:
             raise ValueError("specify either adj or pos")
@@ -47,6 +47,8 @@ class Button_PyGame:
         self.size=size
         if pos is None:
             pos=parent.get_offset(adj, size)
+        else:
+            pos=[ pos[i]-size[i]//2 for i in range(2) ]
         self.pos=pos
         self.color=color
         self.frame_color=frame_color

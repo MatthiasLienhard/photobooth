@@ -136,7 +136,7 @@ class GUI_PyGame:
             if adj[i] == 0:
                 pos[i] = 0
             elif adj[i] == 1:
-                pos[i] = (self.size[i]-item_size[i])/2
+                pos[i] = (self.size[i]-item_size[i])//2
             elif adj[i] ==2:
                 pos[i] = (self.size[i])-item_size[i]
         return tuple(pos)
@@ -217,14 +217,20 @@ class GUI_PyGame:
             surface = pygame.transform.flip(surface, True, False)
         self.surface_list.append((surface, offset))
 
-    def show_message(self, msg, color=(0, 0, 0), bg=(230, 230, 230), transparency=True, outline=(245, 245, 245), size=144,valign=1, halign=1):
+    def show_message(self, msg, color=(0, 0, 0), bg=(230, 230, 230), transparency=True, outline=(245, 245, 245), font_size=144,valign=1, halign=1, pos=None, max_size=None, align=1):
         # Choose font
-        font = pygame.font.Font(None,size)
+        font = pygame.font.Font(None,font_size)
         # Wrap and render text
-        wrapped_text, text_height = self.wrap_text(msg, font, self.size)
-        rendered_text = self.render_text(wrapped_text, text_height, valign, halign, font, color, bg, transparency, outline)
-
-        self.surface_list.append((rendered_text, (0, 0)))
+        if max_size is None:
+            max_size=self.size
+        wrapped_text, text_height, text_width = self.wrap_text(msg, font, max_size)
+        if pos is None:
+            pos=self.get_offset(adj=(halign, valign), item_size=(text_width, text_height))
+        else:
+            pos=(pos[0]-text_width+text_width*halign//2, pos[1]-text_height+text_height*valign//2)
+        rendered_text = self.render_text(wrapped_text, font=font, color=color, bg=bg,
+                                         transparency=transparency, outline=outline, size=(text_width, text_height), align=align)
+        self.surface_list.append((rendered_text, pos))
 
 
     def add_button(self, **kwargs):
@@ -246,7 +252,7 @@ class GUI_PyGame:
         final_lines = []  # resulting wrapped text
         requested_lines = msg.splitlines()  # wrap input along line breaks
         accumulated_height = 0  # accumulated height
-
+        max_width=0 #width of longest line
         # Form a series of lines
         for requested_line in requested_lines:
             # Handle too long lines
@@ -265,6 +271,7 @@ class GUI_PyGame:
                     # Build the line while the words fit.   
                     if font.size(test_line)[0] < size[0]:
                         accumulated_line = test_line
+
                     else:
                         # Start a new line
                         line_height = font.size(accumulated_line)[1]
@@ -276,6 +283,7 @@ class GUI_PyGame:
                             accumulated_line = word + " "
                             # Finish requested_line
                 line_height = font.size(accumulated_line)[1]
+                max_width=max(max_width, font.size(accumulated_line)[0])
                 if accumulated_height + line_height > size[1]:
                     break
                 else:
@@ -285,26 +293,19 @@ class GUI_PyGame:
             else:
                 accumulated_height += font.size(requested_line)[1]
                 final_lines.append(requested_line)
+                max_width=max(max_width, font.size(requested_line)[0])
 
         # Check height of wrapped text
         if accumulated_height >= size[1]:
-            raise GuiException("Wrapped text is too high to fit.")
+            raise GuiException("Wrapped text is too long to fit.")
+        #print("size of {}: {}x{} ({})".format(msg, accumulated_height, max_width, font.size(final_lines[0])[0]))
+        return final_lines, accumulated_height, max_width
 
-        return final_lines, accumulated_height
-
-    def render_text(self, text, text_height, valign, halign, font, color, bg, transparency, outline):
+    def render_text(self, text,  font, color, bg, transparency, outline, size, align=1):
         # Determine vertical position
-        if valign == 0:  # top aligned
-            voffset = 0
-        elif valign == 1:  # centered
-            voffset = int((self.size[1] - text_height) / 2)
-        elif valign == 2:  # bottom aligned
-            voffset = self.size[1] - text_height
-        else:
-            raise GuiException("Invalid valign argument: " + str(valign))
 
         # Create Surface object and fill it with the given background
-        surface = pygame.Surface(self.size)
+        surface = pygame.Surface(size)
         surface.fill(bg)
 
         # Blit one line after another
@@ -312,15 +313,13 @@ class GUI_PyGame:
         for line in text:
             maintext = font.render(line, 1, color)
             shadow = font.render(line, 1, outline)
-            if halign == 0:  # left aligned
-                hoffset = 0
-            elif halign == 1:  # centered
-                hoffset = (self.size[0] - maintext.get_width()) / 2
-            elif halign == 2:  # right aligned
-                hoffset = self.size[0] - maintext.get_width()
+            if align is 0:
+                xpos=0
+            elif align is 2:
+                xpos=size[0]-font.size(line)[0]
             else:
-                raise GuiException("Invalid halign argument: " + str(halign))
-            pos = (hoffset, voffset + accumulated_height)
+                xpos=(size[0]-font.size(line)[0])//2
+            pos = (xpos,  accumulated_height)
             # Outline
             surface.blit(shadow, (pos[0] - 1, pos[1] - 1))
             surface.blit(shadow, (pos[0] - 1, pos[1] + 1))

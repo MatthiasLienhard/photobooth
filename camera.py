@@ -87,6 +87,12 @@ class Camera:
     def set_zoom(self, focal_length):
         self.focal_length=focal_length
         return self.focal_length
+    def zoom_in(self):
+        if self.focal_length is not 'NA':
+            self.set_zoom(self.focal_length + 5)
+    def zoom_out(self):
+        if self.focal_length is not 'NA':
+            self.set_zoom(self.focal_length - 5)
 
     def teardown(self):
         pass

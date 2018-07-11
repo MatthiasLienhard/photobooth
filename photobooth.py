@@ -114,7 +114,7 @@ class Photobooth:
     """
 
     def __init__(self, display_size, picture_basename, picture_size, preview_size,  pose_time, display_time,
-                 slideshow_display_time, printer_name=None, theme="default"):
+                 slideshow_display_time, printer_name=None, theme="default", bubble_prob=0):
         self.start_info_timer=5
         self.screensaver_timer=30
         self.slideshow_timer=slideshow_display_time
@@ -142,6 +142,7 @@ class Photobooth:
         self.theme        = Theme(theme)
         self.filter_opt   = 0
         self.layout_opt   = 1
+        self.bubble_prob=bubble_prob
         self.set_layout()
         self.errors=[]
         self.current_page=None
@@ -253,7 +254,7 @@ class DisplayPage:
         if self.bg is not None:
             self.pb.display.show_picture(self.bg, size=self.pb.display.get_size(), adj=(0,0))
         if self.overlay_text is not None:
-            self.pb.display.show_message(self.overlay_text, size=self.overlay_text_size)
+            self.pb.display.show_message(self.overlay_text, font_size=self.overlay_text_size)
         self.pb.display.apply()
 
     def start(self):
@@ -286,6 +287,22 @@ class StartPage(DisplayPage):
         self.overlay_text=pb.get_info_text()
         self.overlay_text_size = 60
         self.start()
+
+    def apply(self):
+        self.pb.display.clear()
+        self.pb.display.show_message(self.overlay_text, font_size=self.overlay_text_size)
+        #self.pb.display.show_message("(0,0)", font_size=self.overlay_text_size,halign=0, valign=0)
+        #self.pb.display.show_message("(0,1)", font_size=self.overlay_text_size,halign=0, valign=1)
+        #self.pb.display.show_message("(0,2)", font_size=self.overlay_text_size,halign=0, valign=2)
+        #self.pb.display.show_message("(1,0)", font_size=self.overlay_text_size,halign=1, valign=0)
+        #self.pb.display.show_message("(1,1)", font_size=self.overlay_text_size,halign=1, valign=1)
+        #self.pb.display.show_message("(1,2)", font_size=self.overlay_text_size,halign=1, valign=2)
+        #self.pb.display.show_message("(2,0)", font_size=self.overlay_text_size,halign=2, valign=0)
+        #self.pb.display.show_message("(2,1)", font_size=self.overlay_text_size,halign=2, valign=1)
+        #self.pb.display.show_message("(2,2)", font_size=self.overlay_text_size,halign=2, valign=2)
+
+        self.pb.display.apply()
+
 
 class ErrorPage(DisplayPage):
     def __init__(self, pb:Photobooth):
@@ -325,7 +342,7 @@ class SlideshowPage(DisplayPage):
         if self.bg is not None:
             self.pb.display.show_picture(self.bg, size=self.pb.display.get_size(), adj=(0,0))
         if self.overlay_text is not None:
-            self.pb.display.show_message(self.overlay_text, size=self.overlay_text_size)
+            self.pb.display.show_message(self.overlay_text, font_size=self.overlay_text_size)
         self.pb.display.apply()
 
     def jump_image_random(self):
@@ -489,7 +506,7 @@ class ResultPage(DisplayPage):
         if self.bg is not None:
             self.pb.display.show_picture(self.bg, size=self.pb.display.get_size(), adj=(0,0))
         if self.overlay_text is not None:
-            self.pb.display.show_message(self.overlay_text, size=self.overlay_text_size)
+            self.pb.display.show_message(self.overlay_text, font_size=self.overlay_text_size)
         if self.printer_ready:
             self.pb.display.add_button(action_value=3, adj=(2, 2), img_fn=self.pb.theme.get_file_name("printer"))
         self.pb.display.add_button(action_value=2, adj=(0, 2), img_fn=self.pb.theme.get_file_name("trashbin"))
@@ -527,51 +544,76 @@ class ResultPage(DisplayPage):
 
 class SettingsPage(DisplayPage):
     def __init__(self, pb):
-        options=[pb.show_main, pb.show_main, pb.show_layout, pb.show_filter, self.zoom_out, self.zoom_in, self.next_theme, self.prev_theme, self.del_printjobs ]
-        DisplayPage.__init__(self, "Settings", pb,options, pb.screensaver_timer)
+        options=[pb.show_main, pb.show_main, pb.show_layout, pb.show_filter, self.zoom_out, self.zoom_in,
+                 self.next_theme, self.prev_theme, self.del_printjobs, self.bubble_down, self.bubble_up ]
+        DisplayPage.__init__(self, "Settings", pb, options, pb.screensaver_timer)
         self.themes=os.listdir('themes')
         self.theme_idx=self.themes.index(self.pb.theme.name)
         self.start()
 
 
     def apply(self):
-        center=self.pb.display_size[0]/2
-        #row_hight=round((self.pb.display_size[1])/6)
-        rh=100
+        ncols=5
+        nrows=6
+        row_height=self.pb.display_size[1]//(nrows+1)
+        #row_height=100
+        b_size= row_height*8//10
+        cols=[self.pb.display_size[0]*(i+1)//(ncols+1) for i in range(ncols)]
+        rows=[row_height*(2*(i+1)+1)//2 for i in range(nrows)]
+
         self.pb.display.clear()
-        self.pb.display.show_message("Settings", size=72, halign=1, valign=0)
+        self.pb.display.show_message("Settings", font_size=72, halign=1, valign=0)
         self.pb.display.add_button(action_value=1, adj=(2, 2), img_fn=self.pb.theme.get_file_name("return"))
-        self.pb.display.add_button(action_value=2, pos=(center, rh*1+rh//2),size=[300, rh*9//10], img_fn=self.pb.theme.get_file_name("layout_options"))
-        self.pb.display.add_button(action_value=3, pos=(center, rh*2+rh//2),size=[300, rh*9//10], img_fn=self.pb.theme.get_file_name("filter_options"))
-        self.pb.display.add_button(action_value=4, pos=(center-200, rh*3+rh//2),size=[rh*3//4,rh*3//4], img_fn=self.pb.theme.get_file_name("left_button"))
-        self.pb.display.add_button(action_value=5, pos=(center+200, rh*3+rh//2),size=[rh*3//4,rh*3//4], img_fn=self.pb.theme.get_file_name("right_button"))
-        self.pb.display.add_button(action_value=6, pos=(center-200, rh*4+rh//2),size=[rh*3//4,rh*3//4], img_fn=self.pb.theme.get_file_name("left_button"))
-        self.pb.display.add_button(action_value=7, pos=(center+200, rh*4+rh//2),size=[rh*3//4,rh*3//4], img_fn=self.pb.theme.get_file_name("right_button"))
-        self.pb.display.add_button(action_value=8, pos=(center, rh*5+rh//2),size=[300, rh*9//10], img_fn=self.pb.theme.get_file_name("filter_options"))
+        self.pb.display.add_button(action_value=2, pos=(cols[1], rows[0]),size=[300, b_size], img_fn=self.pb.theme.get_file_name("layout_options"))
+        self.pb.display.add_button(action_value=3, pos=(cols[3], rows[0]),size=[300,b_size], img_fn=self.pb.theme.get_file_name("filter_options"))
+        self.pb.display.show_message("Zoom:", font_size=50, pos=(cols[0],rows[1]),  halign=1, valign=1 )
+        self.pb.display.show_message(self.pb.camera.get_zoom(), font_size=50, pos=(cols[2],rows[1]),  halign=1, valign=1 )
+        self.pb.display.add_button(action_value=4, pos=(cols[2]-200, rows[1]),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("left_button"))
+        self.pb.display.add_button(action_value=5, pos=(cols[2]+200, rows[1]),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))
+        self.pb.display.show_message("Theme:", font_size=50, pos=(cols[0],rows[2]),  halign=1, valign=1 )
+        self.pb.display.show_message(self.pb.theme.name, font_size=50, pos=(cols[2],rows[2]),  halign=1, valign=1 )
+        self.pb.display.add_button(action_value=6, pos=(cols[2]-200, rows[2]),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("left_button"))
+        self.pb.display.add_button(action_value=7, pos=(cols[2]+200, rows[2]),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))
+        self.pb.display.show_message("Printer:", font_size=50, pos=(cols[0],rows[3]),  halign=1, valign=1 )
+        self.pb.display.add_button(action_value=8, pos=(cols[1], rows[3]),size=[b_size, b_size], img_fn=self.pb.theme.get_file_name("printer"))
+        self.pb.display.show_message("Bubble gun:", font_size=50, pos=(cols[0],rows[4]),  halign=1, valign=1 )
+        self.pb.display.add_button(action_value=9, pos=(cols[2]-75, rows[4]),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("left_button"))
+        self.pb.display.add_button(action_value=10, pos=(cols[2]+75, rows[4]),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))
+        self.pb.display.show_message("{} %".format(self.pb.bubble_prob), font_size=50, pos=(cols[2],rows[4]),  halign=1, valign=1 )
         self.pb.display.apply()
 
     def zoom_out(self):
-        focal_len=self.pb.camera.get_zoom()
-        self.pb.camera.zoom(focal_len - 1 )
+        self.pb.camera.zoom_out( )
         self.next_action = self.pb.show_settings()
 
     def zoom_in(self):
-        focal_len=self.pb.camera.get_zoom()
-        self.pb.camera.zoom(focal_len + 1 )
+        self.pb.camera.zoom_in( )
+        self.next_action = self.pb.show_settings()
+
+    def bubble_up(self):
+        self.pb.bubble_prob+=5
+        if(self.pb.bubble_prob>100):
+            self.pb.bubble_prob=100
+        self.next_action = self.pb.show_settings()
+
+    def bubble_down(self):
+        self.pb.bubble_prob-=5
+        if(self.pb.bubble_prob<0):
+            self.pb.bubble_prob=0
         self.next_action = self.pb.show_settings()
 
     def next_theme(self):
         self.theme_idx+=1
         if self.theme_idx >= len(self.themes):
             self.theme_idx=0
-        self.theme = Theme(self.themes[self.theme_idx])
+        self.pb.theme = Theme(self.themes[self.theme_idx])
         self.next_action = self.pb.show_settings()
 
     def prev_theme(self):
         self.theme_idx-=1
         if self.theme_idx < 0:
             self.theme_idx=len(self.themes)-1
-        self.theme = Theme(self.themes[self.theme_idx])
+        self.pb.theme = Theme(self.themes[self.theme_idx])
         self.next_action = self.pb.show_settings()
 
     def del_printjobs(self):

@@ -567,7 +567,7 @@ class SettingsPage(DisplayPage):
         self.pb.display.add_button(action_value=2, pos=(cols[1], rows[0]),size=[300, b_size], img_fn=self.pb.theme.get_file_name("layout_options"))
         self.pb.display.add_button(action_value=3, pos=(cols[3], rows[0]),size=[300,b_size], img_fn=self.pb.theme.get_file_name("filter_options"))
         self.pb.display.show_message("Zoom:", font_size=50, pos=(cols[0],rows[1]),  halign=1, valign=1 )
-        self.pb.display.show_message(self.pb.camera.get_zoom(), font_size=50, pos=(cols[2],rows[1]),  halign=1, valign=1 )
+        self.pb.display.show_message("{} mm".format(self.pb.camera.get_zoom()), font_size=50, pos=(cols[2],rows[1]),  halign=1, valign=1 )
         self.pb.display.add_button(action_value=4, pos=(cols[2]-200, rows[1]),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("left_button"))
         self.pb.display.add_button(action_value=5, pos=(cols[2]+200, rows[1]),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))
         self.pb.display.show_message("Theme:", font_size=50, pos=(cols[0],rows[2]),  halign=1, valign=1 )

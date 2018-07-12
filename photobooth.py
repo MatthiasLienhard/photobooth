@@ -140,8 +140,10 @@ class Photobooth:
         self.pose_time    = pose_time
         self.display_time = display_time
         self.theme        = Theme(theme)
-        self.filter_opt   = 0
-        self.layout_opt   = 1
+        self.filter_sel   = 0
+        self.layout_sel   = 1
+        self.layout_options=[True] * N_LAYOUTOPT
+        self.filter_options=[True] * N_FILTEROPT
         self.bubble_prob=bubble_prob
         self.set_layout()
         self.errors=[]
@@ -151,18 +153,24 @@ class Photobooth:
         # self.preview_camera=camera.get_camera(picture_size, preview_size,['picam', 'webcam', 'dslr','dummicam'], self.camera)
         self.preview_camera=camera.get_camera(picture_size, preview_size,default_cam=self.camera)
     def set_layout(self):
-        self.layout = Layout(self.layout_opt, size=self.picture_size, filter_type=self.filter_opt)
+        self.layout = Layout(self.layout_sel, size=self.picture_size, filter_type=self.filter_sel)
 
     def toggle_layout(self):
-        self.layout_opt+=1
-        if self.layout_opt >= N_LAYOUTOPT:
-            self.layout_opt=0
+        while True:
+            self.layout_sel+=1
+            if self.layout_sel >= N_LAYOUTOPT:
+                self.layout_sel=0
+            if self.layout_options[self.layout_sel]:
+                break
         self.set_layout()
 
     def toggle_filter(self):
-        self.filter_opt+=1
-        if self.filter_opt>= N_FILTEROPT:
-            self.filter_opt=0
+        while True:
+            self.filter_sel+=1
+            if self.filter_sel>= N_FILTEROPT:
+                self.filter_sel=0
+            if self.filter_options[self.filter_sel]:
+                break
         self.set_layout()
 
     def run(self, fullscreen=True):
@@ -252,7 +260,7 @@ class DisplayPage:
     def apply(self):
         self.pb.display.clear()
         if self.bg is not None:
-            self.pb.display.show_picture(self.bg, size=self.pb.display.get_size(), adj=(0,0))
+            self.pb.display.show_picture(self.bg, size=self.pb.display.get_size(), adj=(1,1))
         if self.overlay_text is not None:
             self.pb.display.show_message(self.overlay_text, font_size=self.overlay_text_size)
         self.pb.display.apply()
@@ -278,6 +286,10 @@ class DisplayPage:
             self.pb.teardown()
         return False
 
+    def get_pos(self, field, dim=(2,2), frame=(50,50,50,50)): #frame: TLBR
+        if not isinstance(field, list):
+            field=(field % dim[0],field// dim[0])
+        return [round((field[i]+.5)*(self.pb.display_size[i]-frame[0+i]-frame[2+i])/ dim[i]+frame[0+1]) for i in range(2)]
 
 
 class StartPage(DisplayPage):
@@ -291,15 +303,7 @@ class StartPage(DisplayPage):
     def apply(self):
         self.pb.display.clear()
         self.pb.display.show_message(self.overlay_text, font_size=self.overlay_text_size)
-        #self.pb.display.show_message("(0,0)", font_size=self.overlay_text_size,halign=0, valign=0)
-        #self.pb.display.show_message("(0,1)", font_size=self.overlay_text_size,halign=0, valign=1)
-        #self.pb.display.show_message("(0,2)", font_size=self.overlay_text_size,halign=0, valign=2)
-        #self.pb.display.show_message("(1,0)", font_size=self.overlay_text_size,halign=1, valign=0)
-        #self.pb.display.show_message("(1,1)", font_size=self.overlay_text_size,halign=1, valign=1)
-        #self.pb.display.show_message("(1,2)", font_size=self.overlay_text_size,halign=1, valign=2)
-        #self.pb.display.show_message("(2,0)", font_size=self.overlay_text_size,halign=2, valign=0)
-        #self.pb.display.show_message("(2,1)", font_size=self.overlay_text_size,halign=2, valign=1)
-        #self.pb.display.show_message("(2,2)", font_size=self.overlay_text_size,halign=2, valign=2)
+
 
         self.pb.display.apply()
 
@@ -340,7 +344,7 @@ class SlideshowPage(DisplayPage):
         self.pb.display.clear()
         self.pb.display.add_button(action_value=1, pos=(0,0),size=self.pb.display.size)
         if self.bg is not None:
-            self.pb.display.show_picture(self.bg, size=self.pb.display.get_size(), adj=(0,0))
+            self.pb.display.show_picture(self.bg, size=self.pb.display.get_size(), adj=(1,1))
         if self.overlay_text is not None:
             self.pb.display.show_message(self.overlay_text, font_size=self.overlay_text_size)
         self.pb.display.apply()
@@ -387,7 +391,13 @@ class MainPage(DisplayPage):
              pb.show_settings] #todo: add camera opt
         self.overlay_text="Main Menue"
         self.example_img_raw = open_images([self.pb.theme.get_file_name("test_picture", ".jpg")])
+        #todo: this does not work somehow: if option gets disabled its still active at first
+        if not self.pb.layout_options[self.pb.layout_sel]:
+            self.pb.toggle_layout()
+        if not self.pb.filter_options[self.pb.filter_sel]:
+            self.pb.toggle_filter()
         self.set_example_img()
+
         self.start()
 
     def apply(self):
@@ -405,7 +415,8 @@ class MainPage(DisplayPage):
 
     def set_example_img(self):
         self.example_img = self.pb.layout.assemble_pictures(self.example_img_raw * self.pb.layout.n_picture, (600,400))
-        self.example_img=self.example_img.rotate(10,expand=True)
+        self.example_img = self.example_img.rotate(10,expand=True)
+
     def handle_event(self,event):
         action = event.get_action()
         if action in (2,3):
@@ -491,11 +502,13 @@ class ResultPage(DisplayPage):
 
         DisplayPage.__init__(self, "Results", pb, options=opt, timer=timer, bg=img)
         self.printer_ready=False
+        self.printer_message="no print support"
         if pb.printer is not None:
             attr=pb.cups_conn.getPrinterAttributes(pb.printer)
             # todo: more states that should disable printing?
-            print("printer state: "+ attr['printer-state-message'])
-            if attr['printer-state-message'] != 'Unplugged or turned off':
+            self.printer_message=attr['printer-state-message']
+            print("printer state: "+ self.printer_message)
+            if self.printer_message != 'Unplugged or turned off':
                 self.printer_ready=True
 
 
@@ -504,11 +517,12 @@ class ResultPage(DisplayPage):
     def apply(self):
         self.pb.display.clear()
         if self.bg is not None:
-            self.pb.display.show_picture(self.bg, size=self.pb.display.get_size(), adj=(0,0))
+            self.pb.display.show_picture(self.bg, size=self.pb.display.get_size(), adj=(1,1))
         if self.overlay_text is not None:
             self.pb.display.show_message(self.overlay_text, font_size=self.overlay_text_size)
         if self.printer_ready:
             self.pb.display.add_button(action_value=3, adj=(2, 2), img_fn=self.pb.theme.get_file_name("printer"))
+        self.pb.display.show_message(self.printer_message, adj=(2, 2), font_size=30)
         self.pb.display.add_button(action_value=2, adj=(0, 2), img_fn=self.pb.theme.get_file_name("trashbin"))
         self.pb.display.add_button(action_value=1, adj=(1, 2), img_fn=self.pb.theme.get_file_name("button_next"))
         self.pb.display.apply()
@@ -529,15 +543,15 @@ class ResultPage(DisplayPage):
         #    print(e)
         try:
             self.pb.cups_conn.printFile(self.pb.printer, self.bg, " ", {})
-
         except:
             raise #todo: what can go wrong here?
 
         sleep(.1)
 
 
+        #self.pb.display.show_message("start printing...")
         attr=self.pb.cups_conn.getPrinterAttributes(self.pb.printer)
-        self.pb.display.show_message("start printing...\n"+attr['printer-state-message'])
+        self.pb.display.show_message(attr['printer-state-message'])
         self.pb.display.apply()
         sleep(2)
         self.next_action = self.pb.show_main()
@@ -562,24 +576,24 @@ class SettingsPage(DisplayPage):
         rows=[row_height*(2*(i+1)+1)//2 for i in range(nrows)]
 
         self.pb.display.clear()
-        self.pb.display.show_message("Settings", font_size=72, halign=1, valign=0)
-        self.pb.display.add_button(action_value=1, adj=(2, 2), img_fn=self.pb.theme.get_file_name("return"))
-        self.pb.display.add_button(action_value=2, pos=(cols[1], rows[0]),size=[300, b_size], img_fn=self.pb.theme.get_file_name("layout_options"))
-        self.pb.display.add_button(action_value=3, pos=(cols[3], rows[0]),size=[300,b_size], img_fn=self.pb.theme.get_file_name("filter_options"))
-        self.pb.display.show_message("Zoom:", font_size=50, pos=(cols[0],rows[1]),  halign=1, valign=1 )
-        self.pb.display.show_message("{} mm".format(self.pb.camera.get_zoom()), font_size=50, pos=(cols[2],rows[1]),  halign=1, valign=1 )
-        self.pb.display.add_button(action_value=4, pos=(cols[2]-200, rows[1]),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("left_button"))
-        self.pb.display.add_button(action_value=5, pos=(cols[2]+200, rows[1]),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))
-        self.pb.display.show_message("Theme:", font_size=50, pos=(cols[0],rows[2]),  halign=1, valign=1 )
-        self.pb.display.show_message(self.pb.theme.name, font_size=50, pos=(cols[2],rows[2]),  halign=1, valign=1 )
-        self.pb.display.add_button(action_value=6, pos=(cols[2]-200, rows[2]),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("left_button"))
-        self.pb.display.add_button(action_value=7, pos=(cols[2]+200, rows[2]),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))
-        self.pb.display.show_message("Printer:", font_size=50, pos=(cols[0],rows[3]),  halign=1, valign=1 )
-        self.pb.display.add_button(action_value=8, pos=(cols[1], rows[3]),size=[b_size, b_size], img_fn=self.pb.theme.get_file_name("printer"))
-        self.pb.display.show_message("Bubble gun:", font_size=50, pos=(cols[0],rows[4]),  halign=1, valign=1 )
-        self.pb.display.add_button(action_value=9, pos=(cols[2]-75, rows[4]),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("left_button"))
-        self.pb.display.add_button(action_value=10, pos=(cols[2]+75, rows[4]),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))
-        self.pb.display.show_message("{} %".format(self.pb.bubble_prob), font_size=50, pos=(cols[2],rows[4]),  halign=1, valign=1 )
+        self.pb.display.show_message("Settings", font_size=72, adj=(1,0))
+        self.pb.display.add_button(action_value=1, adj=(2, 2), img_fn=self.pb.theme.get_file_name("return"), size=(100,100))
+        self.pb.display.add_button(action_value=2, pos=(cols[1], rows[0]), adj=(1,1),size=[300, b_size], img_fn=self.pb.theme.get_file_name("layout_options"))
+        self.pb.display.add_button(action_value=3, pos=(cols[3], rows[0]), adj=(1,1),size=[300,b_size], img_fn=self.pb.theme.get_file_name("filter_options"))
+        self.pb.display.show_message("Zoom:", font_size=50, pos=(cols[0],rows[1]),   adj=(1,1) )
+        self.pb.display.show_message("{} mm".format(self.pb.camera.get_zoom()), font_size=50, pos=(cols[2],rows[1]),  adj=(1,1))
+        self.pb.display.add_button(action_value=4, pos=(cols[2]-200, rows[1]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("left_button"))
+        self.pb.display.add_button(action_value=5, pos=(cols[2]+200, rows[1]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))
+        self.pb.display.show_message("Theme:", font_size=50, pos=(cols[0],rows[2]),  adj=(1,1) )
+        self.pb.display.show_message(self.pb.theme.name, font_size=50, pos=(cols[2],rows[2]),  adj=(1,1) )
+        self.pb.display.add_button(action_value=6, pos=(cols[2]-200, rows[2]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("left_button"))
+        self.pb.display.add_button(action_value=7, pos=(cols[2]+200, rows[2]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))
+        self.pb.display.show_message("Printer:", font_size=50, pos=(cols[0],rows[3]), adj=(1,1) )
+        self.pb.display.add_button(action_value=8, pos=(cols[1], rows[3]), adj=(1,1),size=[b_size, b_size], img_fn=self.pb.theme.get_file_name("printer"))
+        self.pb.display.show_message("Bubble gun:", font_size=50, pos=(cols[0],rows[4]),  adj=(1,1) )
+        self.pb.display.add_button(action_value=9, pos=(cols[2]-75, rows[4]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("left_button"))
+        self.pb.display.add_button(action_value=10, pos=(cols[2]+75, rows[4]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))
+        self.pb.display.show_message("{} %".format(self.pb.bubble_prob), font_size=50, pos=(cols[2],rows[4]),  adj=(1,1) )
         self.pb.display.apply()
 
     def zoom_out(self):
@@ -619,6 +633,74 @@ class SettingsPage(DisplayPage):
     def del_printjobs(self):
         print("TODO: implement reset of printing queue")
         self.next_action = self.pb.show_settings()
+
+class LayoutPage(DisplayPage):
+    def __init__(self, pb):
+        options=[pb.show_settings, pb.show_settings]
+        self.example_img_raw = open_images([pb.theme.get_file_name("test_picture", ".jpg")])
+        self.example_img = []
+        self.grid_dim=(math.ceil(math.sqrt(N_LAYOUTOPT)), math.ceil(N_LAYOUTOPT/math.ceil(math.sqrt(N_LAYOUTOPT))))
+        img_height=(pb.display_size[1]-150)//self.grid_dim[0]
+        for i in range(N_LAYOUTOPT):
+            layout=Layout(layout_type=i, filter_type=pb.filter_sel)
+            options.append(lambda i=i: self.toggle(i))
+            self.example_img.append(layout.assemble_pictures(self.example_img_raw * layout.n_picture,(img_height*3//2,img_height) ))
+        DisplayPage.__init__(self, "LayoutSelection", pb, options, pb.screensaver_timer)
+        self.start()
+
+    def apply(self):
+        self.pb.display.clear()
+        for i in range(N_LAYOUTOPT):
+            self.pb.display.show_picture(self.example_img[i],pos=self.get_pos(i,self.grid_dim),adj=(1,1), scale=False)
+            button=self.pb.theme.get_file_name("check")
+            if not self.pb.layout_options[i]:
+                button=self.pb.theme.get_file_name("remove")
+            self.pb.display.add_button(action_value=i+2,pos=self.get_pos(i,self.grid_dim), adj=(1, 1), img_fn=button, size=(100,100), press_depth=1)
+        self.pb.display.add_button(action_value=1, adj=(2, 2), img_fn=self.pb.theme.get_file_name("return"), size=(100,100))
+
+        self.pb.display.apply()
+
+    def toggle(self, i):
+        self.pb.layout_options[i]= not self.pb.layout_options[i]
+        if not any(self.pb.layout_options):
+            self.pb.layout_options[0]=True
+        self.next_action=self.pb.show_layout()
+
+
+
+
+class FilterPage(DisplayPage):
+    def __init__(self, pb):
+        options=[pb.show_settings, pb.show_settings]
+        self.example_img_raw = open_images([pb.theme.get_file_name("test_picture", ".jpg")])
+        self.example_img = []
+        self.grid_dim=(math.ceil(math.sqrt(N_FILTEROPT)), math.ceil(N_FILTEROPT/math.ceil(math.sqrt(N_FILTEROPT))))
+        img_height=(pb.display_size[1]-150)//self.grid_dim[0]
+        for i in range(N_FILTEROPT):
+            layout=Layout(layout_type=pb.layout_sel, filter_type=i)
+            options.append(lambda i=i: self.toggle(i))
+            self.example_img.append(layout.assemble_pictures(self.example_img_raw * layout.n_picture,(img_height*3//2,img_height) ))
+        DisplayPage.__init__(self, "LayoutSelection", pb, options, pb.screensaver_timer)
+        self.start()
+
+    def apply(self):
+        self.pb.display.clear()
+        for i in range(N_FILTEROPT):
+            self.pb.display.show_picture(self.example_img[i],pos=self.get_pos(i,self.grid_dim),adj=(1,1), scale=False)
+            button=self.pb.theme.get_file_name("check")
+            if not self.pb.filter_options[i]:
+                button=self.pb.theme.get_file_name("remove")
+            self.pb.display.add_button(action_value=i+2,pos=self.get_pos(i,self.grid_dim), adj=(1, 1), img_fn=button, size=(100,100), press_depth=1)
+        self.pb.display.add_button(action_value=1, adj=(2, 2), img_fn=self.pb.theme.get_file_name("return"), size=(100,100))
+
+        self.pb.display.apply()
+
+    def toggle(self, i):
+        self.pb.filter_options[i]= not self.pb.filter_options[i]
+        if not any(self.pb.filter_options):
+            self.pb.filter_options[0]=True
+
+        self.next_action=self.pb.show_filter()
 
 
 #################

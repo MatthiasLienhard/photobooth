@@ -22,12 +22,13 @@ class GuiException(Exception):
     """Custom exception class to handle GUI class errors"""
 
 class Button_PyGame:
-    def __init__(self, surface_idx, parent, action_value,adj=None, pos=None,size=None, img_fn=None,  text=None, font_color=(0,0,0),font_size=72,  color=None, frame_color=None):
+    def __init__(self, surface_idx, parent, action_value,adj=None, pos=None,size=None, img_fn=None,  text=None, font_color=(0,0,0),font_size=72,  color=None, frame_color=None, press_depth=10):
         self.text=text
         self.font_size=font_size
         self.font_color=font_color
         self.action_value=action_value
         self.surface_idx=surface_idx
+        self.press_depth=press_depth
         if img_fn is None and size is None:
             raise ValueError("specify either size or img")
         if img_fn is not None:
@@ -59,7 +60,7 @@ class Button_PyGame:
         surface = pygame.Surface(self.screen_size, pygame.SRCALPHA)
         pos=list(self.pos)
         if self.down:
-            pos[1]+=self.screen_size[1]/30
+            pos[1]+=self.press_depth
         if self.img is not None:
             surface.blit(self.img, pos)
 
@@ -163,9 +164,7 @@ class GUI_PyGame:
     def trigger_timer_event():
         pygame.event.post(pygame.event.Event(TIMEREVENT))
 
-    def show_picture(self, image, size=(0, 0),adj=(1,1),offset=None, flip=False, scale=True):
-
-
+    def show_picture(self, image, size=(0, 0),adj=(1,1),pos=None, flip=False, scale=True):
         # Use window size if none given
         if size == (0, 0):
             size = self.size
@@ -194,30 +193,31 @@ class GUI_PyGame:
                 #image = pygame.image.frombuffer(image_buf, size, format="RGB")
             except pygame.error as msg:
                 raise GuiException("ERROR: Can't read image from buffer: " + msg)
+        image_size = image.get_rect().size
 
         if scale:
-            # Extract image size and determine scaling
-            image_size = image.get_rect().size
+            # determine scaling factor
             image_scale = min(a / b for a, b in zip(size, image_size))
             # New image size
-            new_size = [int(a * image_scale) for a in image_size]
-            # Update offset
-            if offset is None:
-                offset=self.get_offset(adj, size)
-            offset = tuple(a + int((b - c) / 2) for a, b, c in zip(offset, size, new_size))
+            image_size = [int(a * image_scale) for a in image_size]
             # Apply scaling and display picture
-            image = pygame.transform.scale(image, new_size).convert()
-            size=new_size
-        elif offset is None:
-            offset=self.get_offset(adj, image.get_rect().size)
+            image = pygame.transform.scale(image, image_size).convert()
+
         # Create surface and blit the image to it
-        surface = pygame.Surface(size)
+        surface = pygame.Surface(image_size)
         surface.blit(image, (0, 0))
         if flip:
             surface = pygame.transform.flip(surface, True, False)
-        self.surface_list.append((surface, offset))
 
-    def show_message(self, msg, color=(0, 0, 0), bg=(230, 230, 230), transparency=True, outline=(245, 245, 245), font_size=144,valign=1, halign=1, pos=None, max_size=None, align=1):
+        if pos is None:
+            pos=self.get_offset(adj=adj, item_size=image_size)
+        else:
+            pos=[pos[i]-image_size[i]+image_size[i]*adj[i]//2 for i in range(2)]
+        self.surface_list.append((surface, pos))
+
+
+
+    def show_message(self, msg, color=(0, 0, 0), bg=(230, 230, 230), transparency=True, outline=(245, 245, 245), font_size=144,adj=(1,1), pos=None, max_size=None, align=1):
         # Choose font
         font = pygame.font.Font(None,font_size)
         # Wrap and render text
@@ -225,9 +225,9 @@ class GUI_PyGame:
             max_size=self.size
         wrapped_text, text_height, text_width = self.wrap_text(msg, font, max_size)
         if pos is None:
-            pos=self.get_offset(adj=(halign, valign), item_size=(text_width, text_height))
+            pos=self.get_offset(adj=adj, item_size=(text_width, text_height))
         else:
-            pos=(pos[0]-text_width+text_width*halign//2, pos[1]-text_height+text_height*valign//2)
+            pos=(pos[0]-text_width+text_width*adj[0]//2, pos[1]-text_height+text_height*adj[1]//2)
         rendered_text = self.render_text(wrapped_text, font=font, color=color, bg=bg,
                                          transparency=transparency, outline=outline, size=(text_width, text_height), align=align)
         self.surface_list.append((rendered_text, pos))

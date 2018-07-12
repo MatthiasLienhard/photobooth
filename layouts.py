@@ -48,7 +48,7 @@ class Layout:
         elif layout_type is 3:
             n_picture = 6
             a, b = [(s[i] - 4 * f) / 3 for i in range(2)]
-            img_size = np.array([a, b] * 6, dtype=int).reshape((-1, 2))
+            img_size = np.array([b, a] * 6, dtype=int).reshape((-1, 2))
             offset = np.array(
                 [f, 2*f, a + 2 * f, 2*f, 2 * a + 3 * f, 2 * f,
                  f, 2 * b + f, a + 2 * f, 2 * b + f, 2 * a + 3 * f, 2*b + f],
@@ -68,10 +68,10 @@ class Layout:
         output_img = Image.new('RGB', size, (255, 255, 255))
         for i in range(n_picture):
             input_imgs[i]=filter.crop(input_imgs[i], crop[i])
-            if rotate:
-                input_imgs[i]=input_imgs[i].rotate(-90, expand=True)
             input_imgs[i]=input_imgs[i].resize(img_size[i], Image.ANTIALIAS)
             input_imgs[i]=self.filter_list[i].apply(input_imgs[i])
+            if rotate:
+                input_imgs[i]=input_imgs[i].rotate(-90, expand=True)
             output_img.paste(input_imgs[i], tuple(offset[i]))
         return output_img
 

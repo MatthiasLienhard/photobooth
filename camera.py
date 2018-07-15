@@ -9,6 +9,8 @@ import cv2
 import warnings
 import time
 import os
+
+
 try:
     import sys
 
@@ -19,6 +21,7 @@ try:
     from pysony import SonyAPI, ControlPoint
     import requests
     # import NetworkManager
+    # import nmcli
     sony_enabled = True
 except ImportError:
     sony_enabled=False
@@ -104,13 +107,23 @@ class Camera_sonywifi(Camera):
         self.live_stream = None
         if not sony_enabled:
             raise CameraException("pysony module not installed")
-        self.previous_wifi="yesman" #todo: get the current wifi NAME! not ssid eg with nmcli con show --active or iwgetid -r
+        self.previous_wifi =subprocess.check_output(["nmcli",  "--fields", "NAME", "c" , "show", "--active"]).decode("utf-8").split("\n")[1].strip()
+        #self.previous_wifi="yesman" #todo: get the current wifi NAME! not ssid eg with nmcli con show --active or iwgetid -r
         self.sony_api_version="1.0"
-        try:
-            subprocess.check_call(["nmcli",  "con",  "up", "id", ssid])
-            # takes forever. todo only try to connect if wifi is present
-        except subprocess.CalledProcessError:
-            raise CameraException("Cannot connect to wifi")
+        if self.previous_wifi == ssid:
+            self.previous_wifi=""
+        else:
+            try:
+                wifi_list=subprocess.check_output(["nmcli", "--fields", "SSID", "device", "wifi"]).decode("utf-8").split("\n")
+                wifi_list=[wifi_list[i].strip() for i in range(len(wifi_list))]
+
+                if ssid in wifi_list:
+                    subprocess.check_call(["nmcli",  "con",  "up", "id", ssid])
+                else:
+                    raise CameraException("Sony Wifi not found")
+                # takes forever. todo only try to connect if wifi is present
+            except subprocess.CalledProcessError:
+                raise CameraException("Cannot connect to wifi")
         search = ControlPoint()
         cameras = search.discover()
         self.last_preview_frame=Image.new('RGB', preview_size, (0,0,0) )
@@ -119,8 +132,17 @@ class Camera_sonywifi(Camera):
             self.camera = SonyAPI(QX_ADDR=cameras[0])
         else:
             raise CameraException("No camera found")
+
+
+            self.camera.actZoom(["in", "1shot"])
         options = self.camera.getAvailableApiList()['result'][0]
         print(str(options))
+
+    def zoom_in(self):
+        self.camera.actZoom(["in", "1shot"])
+
+    def zoom_out(self):
+        self.camera.actZoom(["out", "1shot"])
 
     def __del__(self):
         self.teardown()
@@ -129,10 +151,11 @@ class Camera_sonywifi(Camera):
         if sony_enabled:
             if self.live_stream is not None:
                 self.stop_preview_stream()
-            try:
-                subprocess.check_call(["nmcli", "con", "up", "id", self.previous_wifi])
-            except subprocess.CalledProcessError:
-                raise CameraException("Cannot connect to previous wifi " + self.previous_wifi)
+            if self.previous_wifi is not "":
+                try:
+                    subprocess.check_call(["nmcli", "con", "up", "id", self.previous_wifi])
+                except subprocess.CalledProcessError:
+                    raise CameraException("Cannot connect to previous wifi " + self.previous_wifi)
 
     def start_preview_stream(self):
         # For those cameras which need it
@@ -348,7 +371,7 @@ class Camera_gPhoto(Camera):
         pass
         # todo define focus function
 
-def get_camera(picture_size, preview_size,priority_list=['webcam','sony_wifi', 'dslr', 'picam', 'webcam', 'dummicam'], default_cam=None):
+def get_camera(picture_size, preview_size,priority_list=['sony_wifi','webcam', 'dslr', 'picam', 'webcam', 'dummicam'], default_cam=None):
     for type in priority_list:
         if default_cam is not None and default_cam.type is type:
             return default_cam
@@ -383,3 +406,5 @@ def _get_camera(picture_size, preview_size, type):
         return Camera(picture_size, preview_size)
     else:
         raise CameraException("Camera type {} not implemented".format(type))
+
+

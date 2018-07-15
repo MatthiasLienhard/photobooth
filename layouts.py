@@ -45,7 +45,6 @@ class Layout:
         return(pos,image_size)
 
     def get_parameters(self, layout_type, s=None):
-
         rotate=[False,False, False,False,True, False,False]
         n_picture=[1,2,4,6,6,3,2]
         offset=[(0,0)]*n_picture[layout_type]
@@ -57,13 +56,14 @@ class Layout:
                 offset[i],img_size[i]=self.get_image_pos_and_size(i,grid_dim=n, ratio=ratio[layout_type], rotate=rotate[layout_type], total_size=s)
             #print("layout {}: {} - {} - {} - {}".format(layout_type,n_picture[layout_type],img_size,offset,rotate[layout_type]))
         elif layout_type==5:
-            offset[0],img_size[0] =self.get_image_pos_and_size(0,grid_dim=(1,2), ratio=1, rotate=rotate[layout_type], total_size=s,adj=(0,1))
-            offset[1],img_size[1] =self.get_image_pos_and_size(1,grid_dim=(1,2), ratio=1, rotate=rotate[layout_type], total_size=s,adj=(0,1))
-            offset[2],img_size[2] =self.get_image_pos_and_size(0,grid_dim=(1,1), ratio=1, rotate=rotate[layout_type], total_size=s,adj=(2,1))
+            offset[0],img_size[0] =self.get_image_pos_and_size(0,grid_dim=(1, 2), ratio=1, rotate=rotate[layout_type], total_size=s,adj=(0,1))
+            offset[1],img_size[1] =self.get_image_pos_and_size(1,grid_dim=(1, 2), ratio=1, rotate=rotate[layout_type], total_size=s,adj=(0,1))
+            offset[2],img_size[2] =self.get_image_pos_and_size(0,grid_dim=(1, 1), ratio=1, rotate=rotate[layout_type], total_size=s,adj=(2,1))
         elif layout_type==6:
-            offset[0],img_size[0] =self.get_image_pos_and_size(0,grid_dim=(1,2), ratio=3, rotate=rotate[layout_type], total_size=s,adj=(1,1))
-            offset[1],img_size[1] =self.get_image_pos_and_size(1,grid_dim=(1,2), ratio=3, rotate=rotate[layout_type], total_size=s,adj=(1,1))
+            offset[0],img_size[0] =self.get_image_pos_and_size(0,grid_dim=(1, 2), ratio=3, rotate=rotate[layout_type], total_size=s,adj=(1,1))
+            offset[1],img_size[1] =self.get_image_pos_and_size(1,grid_dim=(1, 2), ratio=3, rotate=rotate[layout_type], total_size=s,adj=(1,1))
         return (n_picture[layout_type],img_size,offset,rotate[layout_type])
+
     def assemble_pictures(self, input_imgs, size=None):
         if size is None: #use default
             (n_picture, img_size, offset, rotate)=(self.n_picture, self.img_size, self.offset, self.rotate)

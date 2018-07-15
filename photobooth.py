@@ -152,8 +152,20 @@ class Photobooth:
         self.camera = camera.get_camera(picture_size, preview_size)
         # self.preview_camera=camera.get_camera(picture_size, preview_size,['picam', 'webcam', 'dslr','dummicam'], self.camera)
         self.preview_camera=camera.get_camera(picture_size, preview_size,default_cam=self.camera)
+    def get_printer_state(self):
+        msg = "no print support"
+        ready=False
+        if self.printer is not None:
+            attr = self.cups_conn.getPrinterAttributes(self.printer)
+            msg = attr['printer-state-message']
+            if msg != 'Unplugged or turned off':
+                ready = True
+        return ready, msg
+
     def set_layout(self):
         self.layout = Layout(self.layout_sel, size=self.picture_size, filter_type=self.filter_sel)
+
+
 
     def toggle_layout(self):
         while True:
@@ -501,15 +513,8 @@ class ResultPage(DisplayPage):
         img=self.file_name
 
         DisplayPage.__init__(self, "Results", pb, options=opt, timer=timer, bg=img)
-        self.printer_ready=False
-        self.printer_message="no print support"
-        if pb.printer is not None:
-            attr=pb.cups_conn.getPrinterAttributes(pb.printer)
-            # todo: more states that should disable printing?
-            self.printer_message=attr['printer-state-message']
-            print("printer state: "+ self.printer_message)
-            if self.printer_message != 'Unplugged or turned off':
-                self.printer_ready=True
+        self.printer_ready, self.printer_message=self.pb.get_printer_state()
+
 
 
         self.start()
@@ -559,7 +564,8 @@ class ResultPage(DisplayPage):
 class SettingsPage(DisplayPage):
     def __init__(self, pb):
         options=[pb.show_main, pb.show_main, pb.show_layout, pb.show_filter, self.zoom_out, self.zoom_in,
-                 self.next_theme, self.prev_theme, self.del_printjobs, self.bubble_down, self.bubble_up ]
+                 self.next_theme, self.prev_theme, self.del_printjobs, self.bubble_down, self.bubble_up,
+                 pb.teardown]
         DisplayPage.__init__(self, "Settings", pb, options, pb.screensaver_timer)
         self.themes=os.listdir('themes')
         self.theme_idx=self.themes.index(self.pb.theme.name)
@@ -578,6 +584,8 @@ class SettingsPage(DisplayPage):
         self.pb.display.clear()
         self.pb.display.show_message("Settings", font_size=72, adj=(1,0))
         self.pb.display.add_button(action_value=1, adj=(2, 2), img_fn=self.pb.theme.get_file_name("return"), size=(100,100))
+        self.pb.display.add_button(action_value=11, adj=(0, 2), img_fn=self.pb.theme.get_file_name("exit"),
+                                   size=(100, 50))
         self.pb.display.add_button(action_value=2, pos=(cols[1], rows[0]), adj=(1,1),size=[300, b_size], img_fn=self.pb.theme.get_file_name("layout_options"))
         self.pb.display.add_button(action_value=3, pos=(cols[3], rows[0]), adj=(1,1),size=[300,b_size], img_fn=self.pb.theme.get_file_name("filter_options"))
         self.pb.display.show_message("Zoom:", font_size=50, pos=(cols[0],rows[1]),   adj=(1,1) )
@@ -590,6 +598,9 @@ class SettingsPage(DisplayPage):
         self.pb.display.add_button(action_value=7, pos=(cols[2]+200, rows[2]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))
         self.pb.display.show_message("Printer:", font_size=50, pos=(cols[0],rows[3]), adj=(1,1) )
         self.pb.display.add_button(action_value=8, pos=(cols[1], rows[3]), adj=(1,1),size=[b_size, b_size], img_fn=self.pb.theme.get_file_name("printer"))
+        p_ready, p_msg=self.pb.get_printer_state()
+        self.pb.display.show_message(p_msg, font_size=50, pos=(cols[2], rows[3]), adj=(1, 1))
+
         self.pb.display.show_message("Bubble gun:", font_size=50, pos=(cols[0],rows[4]),  adj=(1,1) )
         self.pb.display.add_button(action_value=9, pos=(cols[2]-75, rows[4]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("left_button"))
         self.pb.display.add_button(action_value=10, pos=(cols[2]+75, rows[4]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))

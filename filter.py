@@ -1,6 +1,8 @@
-from PIL import Image, ImageOps
+import math
 import numpy as np
-import cv2
+from PIL import Image
+
+#import cv2
 
 N_FILTEROPT=5
 
@@ -22,19 +24,22 @@ def get_filters(filter_type, n):
         raise ValueError()
 
 
-def crop(img:Image, mode):
+def crop(img:Image, new_ratio):
     width = img.size[0]
     height = img.size[1]
     ratio=width/height
-    if mode is "none":
+    space=[0,0]
+    dev=ratio/new_ratio-1
+    #print ("cropping dev={}%".format(round(dev*100)))
+    if abs(dev)<0.05: #don't crop with less than ~5% deviance
         return img
-    elif mode is "square":
-        new_width = height
-    elif mode is "portrait":
-        new_width=height/ratio
-    else:
-        raise ValueError('crop mode should be "none", "square", or "portrait"')
-    return img.crop((int((width-new_width)/2),0,int((width+new_width)/2), height))
+    elif ratio < new_ratio: #crop top/bottom
+        space[1]=height - round(width/new_ratio)
+    elif ratio > new_ratio: #crop left/right
+        space[0]=width - round(height*new_ratio)
+
+
+    return img.crop((space[0]//2, space[1]//2, width-space[0]//2, height-space[1]//2))
 
 
 class ImageFilter:

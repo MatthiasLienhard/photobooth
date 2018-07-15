@@ -1,22 +1,15 @@
-find a solution for focus during preview
-picam: do I need circular stream?
 layouts and filters redesign:
     implement different layouts und filters
 gui buttons:
     reverse order
-    nullbutton?
+    nullbutton? eg action for pressing background but not on a button
 take foto page:
-    focus
-    action1: take picture immediately (overload event handler?)
     show in layout?
 camera:
-    focus_during_preview
-    later: add camera: sony wlan?
 
-Einstellungen der kamera (650d):
-    Kontinuierlicher autofokus bei live view aus!!!
-    ISO 100, kurze verschlusszeit, blitz
-    later: manual mode, ISO/blende/verschlusszeit/weisabgleich einstellbar in app?
+Einstellungen der kamera (sony alpha):
+    P mode
+    wifi remote
 
 
 

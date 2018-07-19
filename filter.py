@@ -52,7 +52,10 @@ class ImageFilter:
 
     @classmethod
     def monochrome(cls, img):
-        return (img.convert("L"))
+        if img.mode == 'RGBA':
+            return (img.convert("LA"))
+        else:
+            return (img.convert("L"))
 
     @classmethod
     def hsl(cls,  h, s, l):
@@ -81,7 +84,8 @@ class HighContrastMonochrome(ImageFilter):
 
     def apply(self,img): #set b/w and increase contrast
         img=self.monochrome(img)
-        return(self.change_contrast(img,self.level))
+        return(img)
+        #return(self.change_contrast(img,self.level))
 
 class Rainbowify(ImageFilter):
     # inspired by Jonathan Frech, jfrech.com/jblog/post180/rainbowify.py
@@ -90,6 +94,11 @@ class Rainbowify(ImageFilter):
         self.width=width
 
     def apply(self, img):
+        has_alpha = img.mode == 'RGBA'
+        if has_alpha:
+            alpha=img.getchannel('A')
+            img=img.convert('RGB')
+
         w, h=img.size
         img = self.monochrome(img)
         hue = (np.array(img) / 256 * 360 + np.linspace(0,360,w*h).reshape((h,w))) % 360
@@ -116,18 +125,10 @@ class Rainbowify(ImageFilter):
 
 
         pixels=(pixels+m)*255
-
-        return (Image.fromarray(pixels.astype('uint8'), 'RGB'))
-        pix=img.load()
-        j=0
-        # rainbowify image
-        for y in range(h):
-            for x in range(w):
-                v = sum(pix[x, y])/3./255.
-                pix[x, y] = ImageFilter.hsl((v*360+j)%360, 1, .5)
-                j += 1./w/h*360
-
-        return(img)
+        img=Image.fromarray(pixels.astype('uint8'), 'RGB')
+        if has_alpha:
+            img.putalpha(alpha)
+        return (img)
 
 
 class Sepia(ImageFilter):
@@ -143,14 +144,24 @@ class Sepia(ImageFilter):
         #sepia_palette=np.array([ [r*i//255, g*i//255, b*i//255] for i in range(255) ]).flatten().tolist()
         #img.putpalette(sepia_palette)
         #return (img)
+        has_alpha = img.mode == 'RGBA'
         pixels=np.array(img)
+        #has_alpha = pixels.shape[2] is 4
+        if has_alpha:
+            alpha=pixels[:,:,[3]]
+            pixels=pixels[:,:,:3]
         # https://www.dyclassroom.com/image-processing-project/how-to-convert-a-color-image-into-sepia-image
         r = np.expand_dims(np.sum(pixels * [0.393, 0.769, 0.189], axis=2), 2)
         g = np.expand_dims(np.sum(pixels * [0.349, 0.686, 0.168], axis=2), 2)
         b = np.expand_dims(np.sum(pixels * [0.272, 0.534, 0.131], axis=2), 2)
-        pixels=np.concatenate([r, g, b], axis=2)
-        pixels[pixels>255]=255
-        return Image.fromarray(pixels.astype('uint8'), 'RGB')
+        if has_alpha:
+            pixels=np.concatenate([r, g, b, alpha], axis=2)
+            pixels[pixels>255]=255
+            return Image.fromarray(pixels.astype('uint8'), 'RGBA')
+        else:
+            pixels=np.concatenate([r, g, b], axis=2)
+            pixels[pixels>255]=255
+            return Image.fromarray(pixels.astype('uint8'), 'RGB')
 
 
 class WarholCheGuevaraSerigraph(ImageFilter):
@@ -181,11 +192,17 @@ class WarholCheGuevaraSerigraph(ImageFilter):
 
 
         #fg gets bw
+        has_alpha = img.mode == 'RGBA'
+        if has_alpha:
+            alpha=img.getchannel('A')
+            img=img.convert('RGB')
         img=self.monochrome(img)
-
         #apply colors
         pixels=np.array(self.colorset[self.idx])[(np.array(img)/256*3).astype(int)]
-        return(Image.fromarray(pixels.astype('uint8'), 'RGB'))
+        img=Image.fromarray(pixels.astype('uint8'), 'RGB')
+        if has_alpha:
+            img.putalpha(alpha)
+        return(img)
 
 
 

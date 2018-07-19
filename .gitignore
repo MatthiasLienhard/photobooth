@@ -3,6 +3,6 @@ __*__/
 vorlagen/
 .*/
 venv/
-
+*.log
 
 

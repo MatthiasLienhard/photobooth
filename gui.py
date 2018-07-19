@@ -22,7 +22,7 @@ class GuiException(Exception):
     """Custom exception class to handle GUI class errors"""
 
 class Button_PyGame:
-    def __init__(self, surface_idx, parent, action_value,adj=None, pos=None,size=None, img_fn=None,  text=None, font_color=(0,0,0),font_size=72,  color=None, frame_color=None, press_depth=10):
+    def __init__(self, surface_idx, parent, action_value,adj=None, pos=None,size=None, img_fn=None,  text=None, font_color=(0,0,0),font_size=72,  color=None, frame_color=None, press_depth=10, keep_ratio=False):
         self.text=text
         self.font_size=font_size
         self.font_color=font_color
@@ -39,6 +39,15 @@ class Button_PyGame:
         if size is None:
             size=img.get_rect().size
         elif img is not None:
+            if keep_ratio:
+                original_size=img.get_rect().size
+                aim_ratio=original_size[0]/original_size[1]
+                size_ratio=size[0]/size[1]
+                if aim_ratio < size_ratio: #crop top/bottom
+                    size=(size[0], size[1])#todo: finish!!!!!!!
+                elif aim_ratio > size_ratio: #crop left/right
+                    size=(size[0], size[1])
+
             img=pygame.transform.scale(img, size).convert_alpha()
 
         if adj is None and pos is None:

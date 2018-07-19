@@ -4,7 +4,7 @@ import numpy as np
 import filter
 import math
 
-N_LAYOUTOPT=7
+N_LAYOUTOPT=8
 
 
 
@@ -14,12 +14,11 @@ class Layout:
         self.layout_type = layout_type
         self.size = size
         self.frame_rel = frame_rel
-        (self.n_picture,self.img_size,self.offset,self.rotate)=self.get_parameters(layout_type)
-        #self.n_picture=n_picture
-        #self.img_size=img_size
-        #self.offset=offset
-        #self.rotate=rotate
+        self.n_picture,self.decorations, self.img_size,self.offset,self.rotate = self.get_parameters( layout_type, size)
         self.filter_list = filter.get_filters(filter_type, self.n_picture)
+
+    def get_npic(self):
+        return(self.n_picture-len(self.decorations))
 
     def get_image_pos_and_size(self,field=0, grid_dim=4 , ratio=3/2,rotate=False, total_size=None, frame_rel=None, adj=(1,1)):
         if total_size is None:
@@ -45,10 +44,11 @@ class Layout:
         return(pos,image_size)
 
     def get_parameters(self, layout_type, s=None):
-        rotate=[False,False, False,False,True, False,False]
-        n_picture=[1,2,4,6,6,3,2]
+        rotate=[False,False, False,False,True, False,False, False]
+        n_picture=[1,2,4,6,6,3,2,4]
         offset=[(0,0)]*n_picture[layout_type]
         img_size=[(0,0)]*n_picture[layout_type]
+        decorations=[]
         if layout_type < 5:
             ratio=[3/2,2/3,3/2,1/1,3/2]
             n=n_picture[layout_type]
@@ -62,22 +62,39 @@ class Layout:
         elif layout_type==6:
             offset[0],img_size[0] =self.get_image_pos_and_size(0,grid_dim=(1, 2), ratio=3, rotate=rotate[layout_type], total_size=s,adj=(1,1))
             offset[1],img_size[1] =self.get_image_pos_and_size(1,grid_dim=(1, 2), ratio=3, rotate=rotate[layout_type], total_size=s,adj=(1,1))
-        return (n_picture[layout_type],img_size,offset,rotate[layout_type])
+        elif layout_type==7:
+            offset[0],img_size[0] =self.get_image_pos_and_size(0,grid_dim=(3, 1), ratio=1.1, rotate=rotate[layout_type], total_size=s,adj=(0,0))
+            offset[1],img_size[1] =self.get_image_pos_and_size(0,grid_dim=(3, 1), ratio=1.1, rotate=rotate[layout_type], total_size=s,adj=(0,2))
+            offset[2],img_size[2] =self.get_image_pos_and_size(0,grid_dim=(1, 1), ratio=1, rotate=rotate[layout_type], total_size=s,adj=(2,1))
+            #decoration
+            offset[3],img_size[3] =self.get_image_pos_and_size(0,grid_dim=(3, 1), ratio=1024/130, rotate=rotate[layout_type], total_size=s,adj=(0,1))
+            decorations.append("title")
 
-    def assemble_pictures(self, input_imgs, size=None):
+        return (n_picture[layout_type],decorations, img_size,offset,rotate[layout_type])
+
+    def assemble_pictures(self, input_imgs, theme, size=None):
         if size is None: #use default
-            (n_picture, img_size, offset, rotate)=(self.n_picture, self.img_size, self.offset, self.rotate)
             size=self.size
-        else:
-            (n_picture, img_size, offset, rotate) = self.get_parameters(self.layout_type, size)
+        (n_picture,decorations, img_size, offset, rotate) = self.get_parameters(self.layout_type, size)
         output_img = Image.new('RGB', tuple(size), (255, 255, 255))
+        input_imgs=input_imgs[:self.get_npic()]
+        for i in range(len(decorations)):
+            input_imgs.append(Image.open(theme.get_file_name(decorations[i])))
+
         for i in range(n_picture):
             input_imgs[i]=filter.crop(input_imgs[i],img_size[i][0]/img_size[i][1] )
             input_imgs[i]=input_imgs[i].resize(img_size[i], Image.ANTIALIAS)
             input_imgs[i]=self.filter_list[i].apply(input_imgs[i])
             if rotate:
                 input_imgs[i]=input_imgs[i].rotate(-90, expand=True)
-            output_img.paste(input_imgs[i], tuple(offset[i]))
+            if input_imgs[i].mode == 'LA':
+                input_imgs[i]=input_imgs[i].convert('RGBA')
+            has_alpha = input_imgs[i].mode == 'RGBA'
+            if has_alpha:
+                output_img.paste(input_imgs[i], tuple(offset[i]),input_imgs[i])
+            else:
+                output_img.paste(input_imgs[i], tuple(offset[i]))
+
         return output_img
 
     def apply_filters(self, input_img, n=0):

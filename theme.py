@@ -15,7 +15,7 @@ class Theme:
         elif os.path.isfile(default):
             return default
         else:
-            raise ThemeException(what +" theme not found, neither for " +self.name+" nor default")
+            raise ThemeException(what +suffix +" not found, neither for theme " +self.name+" nor default")
 
 
 

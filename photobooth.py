@@ -221,17 +221,17 @@ class Photobooth:
             try:
                 self.current_page.next_action()
                # Catch exceptions and display message
-            #except camera.CameraException as e:
-            #    self.errors.append(e)
-            #    self.current_page.next_action=self.show_error
+            except camera.CameraException as e:
+                self.errors.append(e)
+                self.current_page.next_action=self.show_error
             # Do not catch KeyboardInterrupt and SystemExit
             except (KeyboardInterrupt, SystemExit):
                 raise
-            #except Exception as e:
-            #    msg='SERIOUS ERROR: ' + repr(e)
-            #    print(msg)
-            #    self.errors.append(PhotoboothException(msg))
-            #    self.current_page.next_action = self.show_error
+            except Exception as e:
+                msg='SERIOUS ERROR: ' + repr(e)
+                print(msg)
+                self.errors.append(PhotoboothException(msg))
+                self.current_page.next_action = self.show_error
 
             #    self.teardown()
 
@@ -319,27 +319,54 @@ class DisplayPage:
 
     def handle_event(self,event):
         action = event.get_action()
-        print(self.name + " handles "+str(event) +"--> action "+str(action))
-        if action is not None and len(self.options) > action:
-            if self.options[action] is not None:
-                self.next_action=self.options[action]
-                return True
-        if event.get_type() is 'quit':
-            self.teardown()
-            return True
-        return False
+        print(self.name + " handles "+str(event))
+        if event.get_type() == 'global':
+            self.next_action=self.teardown
+        elif action is not None and len(self.options) > action and self.options[action] is not None:
+            self.next_action=self.options[action]
+        else:
+            return False
+        return True
 
     def get_pos(self, field, dim=(2,2), frame=(50,50,50,50)): #frame: TLBR
         if not isinstance(field, list) and not isinstance(field, tuple):
             field=(field % dim[0],field// dim[0])
         return [round((field[i]+.5)*(self.display.size[i]-frame[0+i]-frame[2+i])/ dim[i]+frame[0+1]) for i in range(2)]
 
+class PhotobothPage(DisplayPage):
+    def __init__(self,name, pb, options=None, timer=5, bg=None, overlay_text = None):
+        self.pb=pb
+        DisplayPage.__init__(self, name, pb.display, options=options, timer=timer, bg=bg, overlay_text = overlay_text, teardown=pb.teardown)
 
-class StartPage(DisplayPage):
+    def handle_event(self,event):
+        action = event.get_action()
+        print(self.name + " handles "+str(event) + " -> "+str(action))
+        if event.get_type() == 'global':
+            if event.value is 0:
+                self.next_action=self.teardown
+            elif event.value is 1:
+                self.next_action=self.settings
+            elif event.value is 2:
+                self.next_action=self.bubbles
+            else:
+                return False
+        elif action is not None and len(self.options) > action and self.options[action] is not None:
+            self.next_action=self.options[action]
+        else:
+            return False
+        return True
+
+    def bubbles(self):
+        self.pb.enforce_bubbles=True
+        self.wait_for_event()
+
+    def settings(self):
+        self.next_action=self.pb.show_settings
+
+class StartPage(PhotobothPage):
     def __init__(self, pb):
         options=[pb.show_slideshow, pb.show_slideshow ]
-        DisplayPage.__init__(self, "Start", pb.display,options,pb.start_info_timer, teardown=pb.teardown)
-        self.pb=pb
+        PhotobothPage.__init__(self, "Start", pb,options,pb.start_info_timer)
         self.overlay_text=pb.get_info_text()
         self.overlay_text_size = 60
         self.start()
@@ -347,24 +374,20 @@ class StartPage(DisplayPage):
     def apply(self):
         self.display.clear()
         self.display.show_message(self.overlay_text, font_size=self.overlay_text_size)
-
-
         self.display.apply()
 
 
-class ErrorPage(DisplayPage):
+class ErrorPage(PhotobothPage):
     def __init__(self, pb:Photobooth):
-        DisplayPage.__init__(self, "Start", pb.display, teardown=pb.teardown)
-        self.pb=pb
+        PhotobothPage.__init__(self, "Error", pb)
         self.overlay_text = pb.errors[-1].message
         self.timer=2
         self.options=[self.pb.teardown()]
         self.start()
 
-class SlideshowPage(DisplayPage):
+class SlideshowPage(PhotobothPage):
     def __init__(self, pb, photo_idx=None):
-        DisplayPage.__init__(self, "Slideshow", pb.display, teardown=pb.teardown)
-        self.pb=pb
+        PhotobothPage.__init__(self, "Slideshow", pb)
         self.timer=pb.slideshow_timer
         self.options=[ self.jump_image_random,pb.show_main, self.jump_image_rev, self.jump_image_fwd,
              self.show_result,  self.jump_image_frev, self.jump_image_ffwd]
@@ -442,16 +465,14 @@ class SlideshowPage(DisplayPage):
 
 
 
-class MainPage(DisplayPage):
+class MainPage(PhotobothPage):
     def __init__(self, pb: Photobooth):
-        DisplayPage.__init__(self, "Main", pb.display, teardown=pb.teardown)
-        self.pb=pb
+        PhotobothPage.__init__(self, "Main", pb)
         self.timer=pb.screensaver_timer
-        self.options=[pb.show_slideshow,pb.show_shooting, pb.toggle_filter, pb.toggle_layout,
+        self.options=[pb.show_slideshow,pb.show_shooting, self.toggle_filter, self.toggle_layout,
              pb.show_settings] #todo: add camera opt
         self.overlay_text="Main Menue"
         self.example_img_raw = open_images([self.pb.theme.get_file_name("test_picture", ".jpg")])
-        #todo: this does not work somehow: if option gets disabled its still active at first
         if not self.pb.layout_options[self.pb.layout_sel]:
             self.pb.toggle_layout()
         if not self.pb.filter_options[self.pb.filter_sel]:
@@ -476,22 +497,20 @@ class MainPage(DisplayPage):
     def set_example_img(self):
         self.example_img = self.pb.layout.assemble_pictures(self.example_img_raw * self.pb.layout.get_npic(),self.pb.theme, (600,400))
         self.example_img = self.example_img.rotate(10,expand=True)
-
-    def handle_event(self,event):
-        action = event.get_action()
-        if action in (2,3):
-            self.options[action]()
-            self.set_example_img()
-            self.apply()
-            return False
-        else:
-            return DisplayPage.handle_event(self,event)
+    def toggle_filter(self):
+        self.pb.toggle_filter()
+        self.set_example_img()
+        self.start()
+    def toggle_layout(self):
+        self.pb.toggle_layout()
+        self.set_example_img()
+        self.start()
 
 
-class ShootingPage(DisplayPage):
+
+class ShootingPage(PhotobothPage):
     def __init__(self, pb:Photobooth):
-        DisplayPage.__init__(self, "Shooting", pb.display, timer=2, teardown=pb.teardown)
-        self.pb=pb
+        PhotobothPage.__init__(self, "Shooting", pb, timer=2)
         #pb.cam.start_preview()
         #self.bg=pb.get_preview_frame()
         self.posing_timer=pb.pose_time
@@ -506,11 +525,13 @@ class ShootingPage(DisplayPage):
         self.result_filename=pic_list.get_next()
         self.raw_filenames=pic_list.get_raw(pic_list.counter, self.n_pic)
         self.layout=pb.layout
-        if pb.bubble_canon.has_connection() and (pb.enforce_bubbles or np.random.binomial(1, p=[pb.bubble_prob/100])[0]):
-            pb.enforce_bubbles=False
-            pb.bubble_canon.start_bubbles(self.n_pic*(self.posing_timer+3)+4)
-            self.bg=pb.theme.get_file_name("bubbles", ".jpg")
-
+        if pb.enforce_bubbles or np.random.binomial(1, p=[pb.bubble_prob/100])[0]:
+            if pb.bubble_canon.has_connection():
+                pb.enforce_bubbles=False
+                pb.bubble_canon.start_bubbles(self.n_pic*(self.posing_timer+3)+4)
+                self.bg=pb.theme.get_file_name("bubbles", ".jpg")
+            else:
+                print("I would have loved to make bubbles... :-(")
         self.apply()
 
         self.wait_for_event()
@@ -556,7 +577,7 @@ class ShootingPage(DisplayPage):
         result_img.save(self.result_filename)
 
 
-class ResultPage(DisplayPage):
+class ResultPage(PhotobothPage):
     def __init__(self, pb: Photobooth, photo_idx=None):
         timer= pb.screensaver_timer
         opt=[ pb.show_main,pb.show_main, self.delete_pic, self.print_pic ]
@@ -567,8 +588,7 @@ class ResultPage(DisplayPage):
             self.file_name=pb.pictures.get(photo_idx)
         img=self.file_name
 
-        DisplayPage.__init__(self, "Results", pb.display, options=opt, timer=timer, bg=img, teardown=pb.teardown)
-        self.pb=pb
+        PhotobothPage.__init__(self, "Results", pb, options=opt, timer=timer, bg=img)
         self.printer_ready, self.printer_message=self.pb.get_printer_state()
         self.start()
 
@@ -620,20 +640,19 @@ class ResultPage(DisplayPage):
         sleep(2)
         self.next_action = self.pb.show_main()
 
-class SettingsPage(DisplayPage):
+class SettingsPage(PhotobothPage):
     def __init__(self, pb):
         options=[pb.show_main, pb.show_main, pb.show_layout, pb.show_filter, self.zoom_out, self.zoom_in,
                  self.next_theme, self.prev_theme, self.del_printjobs,self.bubble_connect, self.bubble_down, self.bubble_up,
-                 pb.teardown]
-        DisplayPage.__init__(self, "Settings", pb.display, options, pb.screensaver_timer, teardown=pb.teardown)
-        self.pb=pb
+                 self.time_up, self.time_down, pb.teardown]
+        PhotobothPage.__init__(self, "Settings", pb, options, pb.screensaver_timer)
         self.themes=os.listdir('themes')
         self.theme_idx=self.themes.index(self.pb.theme.name)
         self.start()
 
 
     def apply(self):
-        ncols=5
+        ncols=6
         nrows=6
         row_height=self.display.size[1]//(nrows+1)
         #row_height=100
@@ -644,29 +663,36 @@ class SettingsPage(DisplayPage):
         self.display.clear()
         self.display.show_message("Settings", font_size=72, adj=(1,0))
         self.display.add_button(action_value=1, adj=(2, 2), img_fn=self.pb.theme.get_file_name("return"), size=(100,100))
-        self.display.add_button(action_value=12, adj=(0, 2), img_fn=self.pb.theme.get_file_name("exit"),
+        self.display.add_button(action_value=14, adj=(0, 2), img_fn=self.pb.theme.get_file_name("exit"),
                                    size=(100, 50))
-        self.display.add_button(action_value=2, pos=(cols[1], rows[0]), adj=(1,1),size=[300, b_size], img_fn=self.pb.theme.get_file_name("layout_options"))
-        self.display.add_button(action_value=3, pos=(cols[3], rows[0]), adj=(1,1),size=[300,b_size], img_fn=self.pb.theme.get_file_name("filter_options"))
-        self.display.show_message("Zoom:", font_size=50, pos=(cols[0],rows[1]),   adj=(1,1) )
-        self.display.show_message("{} mm".format(self.pb.camera.get_zoom()), font_size=50, pos=(cols[2],rows[1]),  adj=(1,1))
-        self.display.add_button(action_value=4, pos=(cols[2]-200, rows[1]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("left_button"))
-        self.display.add_button(action_value=5, pos=(cols[2]+200, rows[1]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))
-        self.display.show_message("Theme:", font_size=50, pos=(cols[0],rows[2]),  adj=(1,1) )
-        self.display.show_message(self.pb.theme.name, font_size=50, pos=(cols[2],rows[2]),  adj=(1,1) )
-        self.display.add_button(action_value=6, pos=(cols[2]-200, rows[2]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("left_button"))
-        self.display.add_button(action_value=7, pos=(cols[2]+200, rows[2]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))
-        self.display.show_message("Printer:", font_size=50, pos=(cols[0],rows[3]), adj=(1,1) )
-        self.display.add_button(action_value=8, pos=(cols[1], rows[3]), adj=(1,1),size=[b_size, b_size], img_fn=self.pb.theme.get_file_name("printer"))
+        self.display.add_button(action_value=2, pos=(cols[2], rows[0]), adj=(1,1),size=[300, b_size], img_fn=self.pb.theme.get_file_name("layout_options_small"))
+        self.display.add_button(action_value=3, pos=(cols[4], rows[0]), adj=(1,1),size=[300,b_size], img_fn=self.pb.theme.get_file_name("filter_options_small"))
+        self.display.show_message("Zoom:", font_size=50, pos=(cols[1],rows[1]),   adj=(1,1) )
+        self.display.show_message("{} mm".format(self.pb.camera.get_zoom()), font_size=50, pos=(cols[3],rows[1]),  adj=(1,1))
+        self.display.add_button(action_value=4, pos=(cols[3]-100, rows[1]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("left_button"))
+        self.display.add_button(action_value=5, pos=(cols[3]+100, rows[1]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))
+        self.display.show_message("Theme:", font_size=50, pos=(cols[1],rows[2]),  adj=(1,1) )
+        self.display.show_message(self.pb.theme.name, font_size=50, pos=(cols[3],rows[2]),  adj=(1,1) )
+        self.display.add_button(action_value=6, pos=(cols[3]-100, rows[2]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("left_button"))
+        self.display.add_button(action_value=7, pos=(cols[3]+100, rows[2]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))
+        self.display.show_message("Printer:", font_size=50, pos=(cols[1],rows[3]), adj=(1,1) )
+        self.display.add_button(action_value=8, pos=(cols[2], rows[3]), adj=(1,1),size=[b_size, b_size], img_fn=self.pb.theme.get_file_name("printer"))
         p_reay, p_msg=self.pb.get_printer_state()
-        self.display.show_message(p_msg, font_size=50, pos=(cols[2], rows[3]), adj=(1, 1))
+        self.display.show_message(p_msg, font_size=50, pos=(cols[3], rows[3]), adj=(1, 1))
 
-        self.display.show_message("Bubble gun:", font_size=50, pos=(cols[0],rows[4]),  adj=(1,1) )
-        self.display.add_button(action_value=9, pos=(cols[1], rows[4]), adj=(1,1),size=[b_size, b_size], img_fn=self.pb.theme.get_file_name("ble"))
+        self.display.show_message("Bubble gun:", font_size=50, pos=(cols[1],rows[4]),  adj=(1,1) )
+        self.display.add_button(action_value=9, pos=(cols[2], rows[4]), adj=(1,1),size=[b_size, b_size], img_fn=self.pb.theme.get_file_name("ble"))
         if self.pb.bubble_canon.has_connection():
-            self.display.add_button(action_value=10, pos=(cols[2]-75, rows[4]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("left_button"))
-            self.display.add_button(action_value=11, pos=(cols[2]+75, rows[4]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))
-            self.display.show_message("{} %".format(self.pb.bubble_prob), font_size=50, pos=(cols[2],rows[4]),  adj=(1,1) )
+            self.display.add_button(action_value=10, pos=(cols[3]-75, rows[4]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("left_button"))
+            self.display.add_button(action_value=11, pos=(cols[3]+75, rows[4]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))
+            self.display.show_message("{} %".format(self.pb.bubble_prob), font_size=50, pos=(cols[3],rows[4]),  adj=(1,1) )
+
+        self.display.show_message("Posing Time:", font_size=50, pos=(cols[1],rows[5]),  adj=(1,1) )
+        self.display.show_message(str(self.pb.pose_time), font_size=50, pos=(cols[3],rows[5]),  adj=(1,1) )
+        self.display.add_button(action_value=12, pos=(cols[3]-100, rows[5]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("left_button"))
+        self.display.add_button(action_value=13, pos=(cols[3]+100, rows[5]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))
+
+
         self.display.apply()
 
     def zoom_out(self):
@@ -678,43 +704,53 @@ class SettingsPage(DisplayPage):
         self.next_action = self.pb.show_settings()
 
     def bubble_connect(self):
-        self.display.show_message("scanning...", font_size=50, pos=self.get_pos((2,4), dim=(5,6), frame=(0,0,0,0)),  adj=(1,1) )
+        self.display.show_message("scanning...", font_size=50, pos=self.get_pos((3,4), dim=(6,6), frame=(0,0,0,0)),  adj=(1,1) )
         self.display.apply()
         self.pb.bubble_canon.scan()
         self.pb.bubble_canon.connect()
         self.next_action = self.pb.show_settings()
+    def time_up(self):
+        self.pb.pose_time+=1;
+        self.start()
+
+
+    def time_down(self):
+        if(self.pb.pose_time>0):
+            self.pb.pose_time-=1;
+        self.start()
+
 
     def bubble_up(self):
         self.pb.bubble_prob+=5
         if(self.pb.bubble_prob>100):
             self.pb.bubble_prob=100
-        self.next_action = self.pb.show_settings()
+        self.start()
 
     def bubble_down(self):
         self.pb.bubble_prob-=5
         if(self.pb.bubble_prob<0):
             self.pb.bubble_prob=0
-        self.next_action = self.pb.show_settings()
+        self.start()
 
     def next_theme(self):
         self.theme_idx+=1
         if self.theme_idx >= len(self.themes):
             self.theme_idx=0
         self.pb.theme = Theme(self.themes[self.theme_idx])
-        self.next_action = self.pb.show_settings()
+        self.start()
 
     def prev_theme(self):
         self.theme_idx-=1
         if self.theme_idx < 0:
             self.theme_idx=len(self.themes)-1
         self.pb.theme = Theme(self.themes[self.theme_idx])
-        self.next_action = self.pb.show_settings()
+        self.start()
 
     def del_printjobs(self):
         print("TODO: implement reset of printing queue")
-        self.next_action = self.pb.show_settings()
+        self.start()
 
-class LayoutPage(DisplayPage):
+class LayoutPage(PhotobothPage):
     def __init__(self, pb):
         options=[pb.show_settings, pb.show_settings]
         self.example_img_raw = open_images([pb.theme.get_file_name("test_picture", ".jpg")])
@@ -725,8 +761,7 @@ class LayoutPage(DisplayPage):
             layout=Layout(layout_type=i, filter_type=pb.filter_sel)
             options.append(lambda i=i: self.toggle(i))
             self.example_img.append(layout.assemble_pictures(self.example_img_raw * layout.get_npic(),pb.theme,(img_height*3//2,img_height) ))
-        DisplayPage.__init__(self, "LayoutSelection", pb.display, options, pb.screensaver_timer, teardown=pb.teardown)
-        self.pb=pb
+        PhotobothPage.__init__(self, "LayoutSelection", pb, options, pb.screensaver_timer)
         self.start()
 
     def apply(self):
@@ -745,12 +780,12 @@ class LayoutPage(DisplayPage):
         self.pb.layout_options[i]= not self.pb.layout_options[i]
         if not any(self.pb.layout_options):
             self.pb.layout_options[0]=True
-        self.next_action=self.pb.show_layout()
+        self.start()
 
 
 
 
-class FilterPage(DisplayPage):
+class FilterPage(PhotobothPage):
     def __init__(self, pb):
         options=[pb.show_settings, pb.show_settings]
         self.example_img_raw = open_images([pb.theme.get_file_name("test_picture", ".jpg")])
@@ -761,8 +796,7 @@ class FilterPage(DisplayPage):
             layout=Layout(layout_type=pb.layout_sel, filter_type=i)
             options.append(lambda i=i: self.toggle(i))
             self.example_img.append(layout.assemble_pictures(self.example_img_raw * layout.get_npic(),pb.theme,(img_height*3//2,img_height) ))
-        DisplayPage.__init__(self, "LayoutSelection", pb.display, options, pb.screensaver_timer, teardown=pb.teardown)
-        self.pb=pb
+        PhotobothPage.__init__(self, "LayoutSelection", pb, options, pb.screensaver_timer)
         self.start()
 
     def apply(self):
@@ -782,7 +816,7 @@ class FilterPage(DisplayPage):
         if not any(self.pb.filter_options):
             self.pb.filter_options[0]=True
 
-        self.next_action=self.pb.show_filter()
+        self.start()
 
 
 class TimePage(DisplayPage):

@@ -13,17 +13,19 @@ except ImportError:
 
 
 class Event:
-    eventname = ['quit', 'key', 'mouseclick', 'gpio', 'timer']
+    eventname = ['global', 'key', 'mouseclick', 'gpio', 'timer']
+
     def __init__(self, type, value=None):
-        """type  0: quit
-                 1: keystroke 
+        """type  1: keystroke
                  2: mouseclick
                  3: gpio
                  4: timer
         """
-        if type == 1 and value in (27,113): #ESC, q
-            type=0
 
+        global_actions={27:0,113:0,115:1,98:2}
+        if type == 1 and value in global_actions.keys():
+            type=0
+            value=global_actions[value]
         self.type = type
         self.value = value
 
@@ -37,7 +39,9 @@ class Event:
         if self.get_type() is 'timer':
             return 0
         elif self.get_type() is 'key':
-            if self.value == 274: #down
+            if self.value in range(48,58): #down
+                return self.value - 48
+            elif self.value == 274:
                 return 1
             elif self.value == 276: #left
                 return 2
@@ -53,6 +57,7 @@ class Event:
         elif self.get_type() is 'mouseclick':
             return self.value
         return None
+
 
 
 

@@ -1,23 +1,25 @@
-from bluepy import btle
 from time import time, sleep
 
-class ScanDelegate(btle.DefaultDelegate):
-    def __init__(self):
-        btle.DefaultDelegate.__init__(self)
-    def handleDiscovery(self, dev, isNewDev, isNewData):
-        if isNewDev:
-            print ("Discovered device {}".format( dev.addr))
-        elif isNewData:
-            print ("Received new data from {}".format(dev.addr))
+try:
+
+    from bluepy import btle
+    ble_support=True
+except ImportError:
+    ble_support=False
 
 class BubbleCanon:
     def __init__(self):
         self.conn=None
-        self.write_uuid = btle.UUID(0x2222)
-        # e8:c5:c5:88:83:66
         self.addr="e8:c5:c5:88:83:66"
+        if ble_support:
+            self.write_uuid = btle.UUID(0x2222)
+
+
         
     def scan(self, name="BubbleCannon", timeout=6, limitone=False):
+        if not ble_support:
+            print("no ble support")
+            return False
         scanner = btle.Scanner() #.withDelegate(ScanDelegate())
         t0=time()    
         scanned=set()
@@ -67,6 +69,9 @@ class BubbleCanon:
 
     def connect(self):
         # connect to BLE
+        if not ble_support:
+            print("no ble support")
+            return False
         try:
             self.conn = btle.Peripheral(self.addr, "random")
         except btle.BTLEException as e:
@@ -74,21 +79,25 @@ class BubbleCanon:
         return self.has_connection()
 
     def disconnect(self):
-        self.conn.disconnect()
-        self.conn=None
+        if self.has_connection():
+            self.conn.disconnect()
+            self.conn=None
 
 
     def list_services(self):
-        for svc in self.conn.services:
-            print(str(svc), ":")
-            for ch in svc.getCharacteristics():
-                print("    {}, hnd={}, supports {}".format(ch, hex(ch.handle), ch.propertiesToString()))
-                chName = btle.AssignedNumbers.getCommonName(ch.uuid)
-                if (ch.supportsRead()):
-                    try:
-                        print("    ->", repr(ch.read()))
-                    except btle.BTLEException as e:
-                        print("    ->", e)
+        if not ble_support:
+            print("no ble support")
+        else:
+            for svc in self.conn.services:
+                print(str(svc), ":")
+                for ch in svc.getCharacteristics():
+                    print("    {}, hnd={}, supports {}".format(ch, hex(ch.handle), ch.propertiesToString()))
+                    chName = btle.AssignedNumbers.getCommonName(ch.uuid)
+                    if (ch.supportsRead()):
+                        try:
+                            print("    ->", repr(ch.read()))
+                        except btle.BTLEException as e:
+                            print("    ->", e)
 
 
 

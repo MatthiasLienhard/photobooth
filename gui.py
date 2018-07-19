@@ -44,9 +44,9 @@ class Button_PyGame:
                 aim_ratio=original_size[0]/original_size[1]
                 size_ratio=size[0]/size[1]
                 if aim_ratio < size_ratio: #crop top/bottom
-                    size=(size[0], size[1])#todo: finish!!!!!!!
+                    size=(round(size[1]*aim_ratio), size[1])
                 elif aim_ratio > size_ratio: #crop left/right
-                    size=(size[0], size[1])
+                    size=(size[0], round(size[0]/aim_ratio))
 
             img=pygame.transform.scale(img, size).convert_alpha()
 

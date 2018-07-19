@@ -45,30 +45,40 @@ class Layout:
 
     def get_parameters(self, layout_type, s=None):
         rotate=[False,False, False,False,True, False,False, False]
-        n_picture=[1,2,4,6,6,3,2,4]
+        n_picture=[2,3,5,7,7,4,3,4]
         offset=[(0,0)]*n_picture[layout_type]
         img_size=[(0,0)]*n_picture[layout_type]
         decorations=[]
         if layout_type < 5:
             ratio=[3/2,2/3,3/2,1/1,3/2]
-            n=n_picture[layout_type]
+            n=n_picture[layout_type]-1
             for i in range(n):
                 offset[i],img_size[i]=self.get_image_pos_and_size(i,grid_dim=n, ratio=ratio[layout_type], rotate=rotate[layout_type], total_size=s)
+            if layout_type==4:
+                decorations.append("decoration_vertical")
+                offset[n],img_size[n]=self.get_image_pos_and_size(0,grid_dim=1, ratio=1024/130, rotate=rotate[layout_type], total_size=s)
+            else:
+                decorations.append("decoration_square")
+                offset[n],img_size[n]=self.get_image_pos_and_size(15,grid_dim=16, ratio=1, rotate=rotate[layout_type], total_size=s)
             #print("layout {}: {} - {} - {} - {}".format(layout_type,n_picture[layout_type],img_size,offset,rotate[layout_type]))
         elif layout_type==5:
             offset[0],img_size[0] =self.get_image_pos_and_size(0,grid_dim=(1, 2), ratio=1, rotate=rotate[layout_type], total_size=s,adj=(0,1))
             offset[1],img_size[1] =self.get_image_pos_and_size(1,grid_dim=(1, 2), ratio=1, rotate=rotate[layout_type], total_size=s,adj=(0,1))
             offset[2],img_size[2] =self.get_image_pos_and_size(0,grid_dim=(1, 1), ratio=1, rotate=rotate[layout_type], total_size=s,adj=(2,1))
+            offset[3],img_size[3]=self.get_image_pos_and_size(15,grid_dim=16, ratio=1, rotate=rotate[layout_type], total_size=s)
+            decorations.append("decoration_square")
         elif layout_type==6:
-            offset[0],img_size[0] =self.get_image_pos_and_size(0,grid_dim=(1, 2), ratio=3, rotate=rotate[layout_type], total_size=s,adj=(1,1))
-            offset[1],img_size[1] =self.get_image_pos_and_size(1,grid_dim=(1, 2), ratio=3, rotate=rotate[layout_type], total_size=s,adj=(1,1))
+            offset[0],img_size[0] =self.get_image_pos_and_size(0,grid_dim=(1, 2), ratio=2.9, rotate=rotate[layout_type], total_size=s,adj=(0,1))
+            offset[1],img_size[1] =self.get_image_pos_and_size(1,grid_dim=(1, 2), ratio=2.9, rotate=rotate[layout_type], total_size=s,adj=(0,1))
+            offset[2],img_size[2] =self.get_image_pos_and_size(0,grid_dim=(1, 1), ratio=130/1024, rotate=rotate[layout_type], total_size=s,adj=(2,1))
+            decorations.append("decoration_vertical")
         elif layout_type==7:
             offset[0],img_size[0] =self.get_image_pos_and_size(0,grid_dim=(3, 1), ratio=1.1, rotate=rotate[layout_type], total_size=s,adj=(0,0))
             offset[1],img_size[1] =self.get_image_pos_and_size(0,grid_dim=(3, 1), ratio=1.1, rotate=rotate[layout_type], total_size=s,adj=(0,2))
             offset[2],img_size[2] =self.get_image_pos_and_size(0,grid_dim=(1, 1), ratio=1, rotate=rotate[layout_type], total_size=s,adj=(2,1))
             #decoration
             offset[3],img_size[3] =self.get_image_pos_and_size(0,grid_dim=(3, 1), ratio=1024/130, rotate=rotate[layout_type], total_size=s,adj=(0,1))
-            decorations.append("title")
+            decorations.append("decoration_horizontal")
 
         return (n_picture[layout_type],decorations, img_size,offset,rotate[layout_type])
 

@@ -168,6 +168,8 @@ class Photobooth:
         self.bubble_prob=bubble_prob
         self.enforce_bubbles=False
         self.bubble_canon=BubbleCanon()
+        if self.bubble_canon.scan(timeout=1):
+            self.bubble_canon.connect()
         self.set_layout()
         self.errors=[]
         self.current_page=None
@@ -238,6 +240,7 @@ class Photobooth:
         self.display.show_message("Shutting down...")
         self.display.apply()
         self.display.gpio.set_output(GPIO_LAMP, 0)
+        self.bubble_canon.disconnect()
         self.camera.teardown()
         sleep(0.5)
         self.display.teardown()
@@ -492,8 +495,6 @@ class ShootingPage(DisplayPage):
         #pb.cam.start_preview()
         #self.bg=pb.get_preview_frame()
         self.posing_timer=pb.pose_time
-
-
         self.options=[self.take_pictures]
         self.next=pb.show_result
         self.n_pic=pb.layout.get_npic()
@@ -505,9 +506,9 @@ class ShootingPage(DisplayPage):
         self.result_filename=pic_list.get_next()
         self.raw_filenames=pic_list.get_raw(pic_list.counter, self.n_pic)
         self.layout=pb.layout
-        if pb.bubble_canon.hasConnection() and (pb.enforce_bubbles or np.random.binomial(1, p=[pb.bubble_prob/100])[0]):
+        if pb.bubble_canon.has_connection() and (pb.enforce_bubbles or np.random.binomial(1, p=[pb.bubble_prob/100])[0]):
             pb.enforce_bubbles=False
-            pb.bubble_canon.startBubles(self.n_pic*(self.posing_timer+1)+2)
+            pb.bubble_canon.start_bubbles(self.n_pic*(self.posing_timer+3)+4)
             self.bg=pb.theme.get_file_name("bubbles", ".jpg")
 
         self.apply()
@@ -622,7 +623,7 @@ class ResultPage(DisplayPage):
 class SettingsPage(DisplayPage):
     def __init__(self, pb):
         options=[pb.show_main, pb.show_main, pb.show_layout, pb.show_filter, self.zoom_out, self.zoom_in,
-                 self.next_theme, self.prev_theme, self.del_printjobs, self.bubble_down, self.bubble_up,
+                 self.next_theme, self.prev_theme, self.del_printjobs,self.bubble_connect, self.bubble_down, self.bubble_up,
                  pb.teardown]
         DisplayPage.__init__(self, "Settings", pb.display, options, pb.screensaver_timer, teardown=pb.teardown)
         self.pb=pb
@@ -643,7 +644,7 @@ class SettingsPage(DisplayPage):
         self.display.clear()
         self.display.show_message("Settings", font_size=72, adj=(1,0))
         self.display.add_button(action_value=1, adj=(2, 2), img_fn=self.pb.theme.get_file_name("return"), size=(100,100))
-        self.display.add_button(action_value=11, adj=(0, 2), img_fn=self.pb.theme.get_file_name("exit"),
+        self.display.add_button(action_value=12, adj=(0, 2), img_fn=self.pb.theme.get_file_name("exit"),
                                    size=(100, 50))
         self.display.add_button(action_value=2, pos=(cols[1], rows[0]), adj=(1,1),size=[300, b_size], img_fn=self.pb.theme.get_file_name("layout_options"))
         self.display.add_button(action_value=3, pos=(cols[3], rows[0]), adj=(1,1),size=[300,b_size], img_fn=self.pb.theme.get_file_name("filter_options"))
@@ -661,9 +662,11 @@ class SettingsPage(DisplayPage):
         self.display.show_message(p_msg, font_size=50, pos=(cols[2], rows[3]), adj=(1, 1))
 
         self.display.show_message("Bubble gun:", font_size=50, pos=(cols[0],rows[4]),  adj=(1,1) )
-        self.display.add_button(action_value=9, pos=(cols[2]-75, rows[4]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("left_button"))
-        self.display.add_button(action_value=10, pos=(cols[2]+75, rows[4]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))
-        self.display.show_message("{} %".format(self.pb.bubble_prob), font_size=50, pos=(cols[2],rows[4]),  adj=(1,1) )
+        self.display.add_button(action_value=9, pos=(cols[1], rows[4]), adj=(1,1),size=[b_size, b_size], img_fn=self.pb.theme.get_file_name("ble"))
+        if self.pb.bubble_canon.has_connection():
+            self.display.add_button(action_value=10, pos=(cols[2]-75, rows[4]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("left_button"))
+            self.display.add_button(action_value=11, pos=(cols[2]+75, rows[4]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))
+            self.display.show_message("{} %".format(self.pb.bubble_prob), font_size=50, pos=(cols[2],rows[4]),  adj=(1,1) )
         self.display.apply()
 
     def zoom_out(self):
@@ -672,6 +675,13 @@ class SettingsPage(DisplayPage):
 
     def zoom_in(self):
         self.pb.camera.zoom_in( )
+        self.next_action = self.pb.show_settings()
+
+    def bubble_connect(self):
+        self.display.show_message("scanning...", font_size=50, pos=self.get_pos((2,4), dim=(5,6), frame=(0,0,0,0)),  adj=(1,1) )
+        self.display.apply()
+        self.pb.bubble_canon.scan()
+        self.pb.bubble_canon.connect()
         self.next_action = self.pb.show_settings()
 
     def bubble_up(self):
@@ -856,7 +866,9 @@ def display_time(display_size, fullscreen):
 def main(args):
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
     # Image basename
-    t=internet_time()
+    t=False #speed up 
+    #t=internet_time()
+    
     #if True:
     if not t:
         t=display_time(args.display_size, args.fullscreen)

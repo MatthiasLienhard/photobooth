@@ -96,7 +96,8 @@ class Rainbowify(ImageFilter):
     def apply(self, img):
         has_alpha = img.mode == 'RGBA'
         if has_alpha:
-            alpha=img.getchannel('A')
+            # alpha=img.getchannel('A')
+            alpha=img.split()[-1]
             img=img.convert('RGB')
 
         w, h=img.size
@@ -194,7 +195,8 @@ class WarholCheGuevaraSerigraph(ImageFilter):
         #fg gets bw
         has_alpha = img.mode == 'RGBA'
         if has_alpha:
-            alpha=img.getchannel('A')
+            # alpha=img.getchannel('A') #PIP 4.0 incompatible
+            alpha=img.split()[-1]
             img=img.convert('RGB')
         img=self.monochrome(img)
         #apply colors

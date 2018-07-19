@@ -3,7 +3,7 @@ from PIL import Image
 import numpy as np
 import filter
 import math
-
+import logging
 N_LAYOUTOPT=8
 
 
@@ -60,7 +60,7 @@ class Layout:
             else:
                 decorations.append("decoration_square")
                 offset[n],img_size[n]=self.get_image_pos_and_size(15,grid_dim=16, ratio=1, rotate=rotate[layout_type], total_size=s)
-            #print("layout {}: {} - {} - {} - {}".format(layout_type,n_picture[layout_type],img_size,offset,rotate[layout_type]))
+            #logging.info("layout {}: {} - {} - {} - {}".format(layout_type,n_picture[layout_type],img_size,offset,rotate[layout_type]))
         elif layout_type==5:
             offset[0],img_size[0] =self.get_image_pos_and_size(0,grid_dim=(1, 2), ratio=1, rotate=rotate[layout_type], total_size=s,adj=(0,1))
             offset[1],img_size[1] =self.get_image_pos_and_size(1,grid_dim=(1, 2), ratio=1, rotate=rotate[layout_type], total_size=s,adj=(0,1))
@@ -110,5 +110,5 @@ class Layout:
     def apply_filters(self, input_img, n=0):
         output_img = filter.crop(input_img, self.img_size[n][0]/self.img_size[n][1])
         output_img = self.filter_list[n].apply(output_img)
-        #print("img size: {}x{}".format(output_img.size[0], output_img.size[1]))
+        #logging.info("img size: {}x{}".format(output_img.size[0], output_img.size[1]))
         return output_img

@@ -4,6 +4,7 @@ GPIO_MAIN = 24
 GPIO_LEFT = 23
 GPIO_RIGHT = 22
 GPIO_LAMP = 4
+import logging
 try:
     import RPi.GPIO as GPIO
     gpio_enabled = True
@@ -67,8 +68,8 @@ class Rpi_GPIO:
             input_channels = [GPIO_MAIN , GPIO_LEFT, GPIO_RIGHT ]
             output_channels = [GPIO_LAMP]
             # Display initial information
-            print("Your Raspberry Pi is board revision " + str(GPIO.RPI_INFO['P1_REVISION']))
-            print("RPi.GPIO version is " + str(GPIO.VERSION))
+            logging.info("Your Raspberry Pi is board revision " + str(GPIO.RPI_INFO['P1_REVISION']))
+            logging.info("RPi.GPIO version is " + str(GPIO.VERSION))
 
             # Choose BCM numbering system
             GPIO.setmode(GPIO.BCM)
@@ -83,7 +84,7 @@ class Rpi_GPIO:
                 GPIO.setup(output_channel, GPIO.OUT)
                 GPIO.output(output_channel, GPIO.LOW)
         else:
-            print("Warning: RPi.GPIO could not be loaded. GPIO disabled.")
+            logging.info("Warning: RPi.GPIO could not be loaded. GPIO disabled.")
 
     def teardown(self):
         if gpio_enabled:

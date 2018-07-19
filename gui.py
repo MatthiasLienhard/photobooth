@@ -2,6 +2,7 @@
 # Created by br _at_ re-web _dot_ eu, 2015
 #from photobooth import Photobooth
 import tkinter as tk
+import logging
 from PIL import Image
 import pygame
 import time
@@ -92,10 +93,10 @@ class Button_PyGame:
         if pos[0]>=self.pos[0] and pos[0] <= self.pos[0]+self.size[0] \
             and pos[1] >= self.pos[1] and pos[1] <= self.pos[1] + self.size[1]:
             if down:
-                print("button {} pressed!".format(self.action_value))
+                logging.info("button {} pressed!".format(self.action_value))
                 self.down=True
             else:
-                print("button {} released!".format(self.action_value))
+                logging.info("button {} released!".format(self.action_value))
                 pygame.event.post(pygame.event.Event(BUTTONEVENT, action=self.action_value))
             return True
         return False
@@ -181,7 +182,7 @@ class GUI_PyGame:
             filename=image
             try:
                 # Load image from file
-                print("opening "+filename)
+                logging.info("opening "+filename)
                 image = pygame.image.load(filename)
             except pygame.error as msg:
                 raise GuiException("ERROR: Can't open image '" + filename + "': " + str(msg))
@@ -307,7 +308,7 @@ class GUI_PyGame:
         # Check height of wrapped text
         if accumulated_height >= size[1]:
             raise GuiException("Wrapped text is too long to fit.")
-        #print("size of {}: {}x{} ({})".format(msg, accumulated_height, max_width, font.size(final_lines[0])[0]))
+        #logging.info("size of {}: {}x{} ({})".format(msg, accumulated_height, max_width, font.size(final_lines[0])[0]))
         return final_lines, accumulated_height, max_width
 
     def render_text(self, text,  font, color, bg, transparency, outline, size, align=1):
@@ -358,7 +359,7 @@ class GUI_PyGame:
         elif event.type == TIMEREVENT: #timer event
             return True, events.Event(4,None)
         elif event.type == BUTTONEVENT: #button event
-            print("Button {} clicked".format(event.action))
+            logging.info("Button {} clicked".format(event.action))
             return True, events.Event(2,event.action)
         elif event.type == pygame.MOUSEBUTTONDOWN:
             pressed=[]
@@ -407,7 +408,7 @@ class GUI_PyGame:
                 return e
             else:
                 pass
-                # print("discarded pygames event of type {}".format(event.type))
+                # logging.info("discarded pygames event of type {}".format(event.type))
 
     def set_timer(self, sec):
         #triggers timer event every [sec] seconds

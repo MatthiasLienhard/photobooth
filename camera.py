@@ -2,7 +2,7 @@
 # Created by br@re-web.eu, 2015
 
 import subprocess
-
+import logging
 from PIL import Image, ImageDraw
 import io
 import cv2
@@ -15,7 +15,7 @@ try:
     import sys
 
     sony_path=os.path.dirname(os.path.dirname(__file__)) + "/sony_camera_api/src"
-    print(sony_path)
+    logging.info(sony_path)
     sys.path.insert(0, sony_path)
     #/home/matthias/projects/github/sony_camera_api/src")
     from pysony import SonyAPI, ControlPoint
@@ -136,7 +136,7 @@ class Camera_sonywifi(Camera):
 
             self.camera.actZoom(["in", "1shot"])
         options = self.camera.getAvailableApiList()['result'][0]
-        print(str(options))
+        logging.info(str(options))
 
     def zoom_in(self):
         self.camera.actZoom(["in", "1shot"])
@@ -160,7 +160,7 @@ class Camera_sonywifi(Camera):
     def start_preview_stream(self):
         # For those cameras which need it
         options = self.camera.getAvailableApiList()['result'][0]
-        print("starting preview")
+        logging.info("starting preview")
         if 'startRecMode' in options:
             self.camera.startRecMode()
             time.sleep(1)
@@ -175,7 +175,7 @@ class Camera_sonywifi(Camera):
         self.preview_active = True
 
     def stop_preview_stream(self):
-        print("stopping preview")
+        logging.info("stopping preview")
         if self.live_stream is not None:
             self.live_stream.stop()
             options = self.camera.getAvailableApiList()['result'][0]
@@ -209,7 +209,7 @@ class Camera_sonywifi(Camera):
     def take_picture(self, filename="/tmp/picture.jpg"):
         options = self.camera.getAvailableApiList()['result'][0]
         url = self.camera.actTakePicture()
-        print(url)
+        logging.info(url)
         response = requests.get(url['result'][0][0].replace('\\', ''))
         img=Image.open(io.BytesIO(response.content))
         if filename is not None:
@@ -281,7 +281,7 @@ class Camera_pi(Camera):
     def get_preview_frame(self, filename=None, filter=None):
         if not self.preview_active:
             raise CameraException("preview inactive")
-        #print("get preview frame")
+        #logging.info("get preview frame")
         #data = io.BytesIO()
         #self.preview_stream.copy_to(data, first_frame=list(self.preview_stream.frames)[-1] )
         stream = io.BytesIO()
@@ -359,12 +359,12 @@ class Camera_gPhoto(Camera):
 
     def press_half(self):
         if 'eosremoterelease' in self.cam._get_config()['actions']:
-            print("press half")
+            logging.info("press half")
             self.cam._get_config()['actions']['eosremoterelease'].set('Press Half')#
 
     def release_full(self):
         if 'eosremoterelease' in self.cam._get_config()['actions']:
-            print("release full")
+            logging.info("release full")
             self.cam._get_config()['actions']['eosremoterelease'].set('Release Full')#
 
     def focus(self):
@@ -381,7 +381,7 @@ def get_camera(picture_size, preview_size,priority_list=['sony_wifi','webcam', '
                 return cam
 
 def _get_camera(picture_size, preview_size, type):
-    print("try to get camera of type "+type)
+    logging.info("try to get camera of type "+type)
     if type=='sony_wifi':
         try:
             return Camera_sonywifi(picture_size, preview_size)

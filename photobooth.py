@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-
+import logging
 import math
 import os
 import argparse
@@ -10,7 +10,7 @@ from sys import exit
 from time import sleep, time, strftime, gmtime
 from dateutil.relativedelta import relativedelta
 import datetime
-
+logging.basicConfig(filename='logfile.log',level=logging.DEBUG)
 from PIL import Image
 # from camera import CameraException, Camera_cv as CameraModule
 # from camera import CameraException, Camera_gPhoto as CameraModule
@@ -32,7 +32,7 @@ try:
     _has_cups=True
 except ImportError:
     _has_cups=False
-    print("for printer support, install pycups")
+    logging.info("for printer support, install pycups")
 
 class PhotoboothException(Exception):
     """Custom exception class to handle camera class errors"""
@@ -87,8 +87,8 @@ class PictureList:
             #todo: initialize deleted with missing files?
 
         # Print initial infos
-        print("Info: Number of last existing file: " + str(self.counter))
-        print("Info: Saving assembled pictures as: " + self.dirname +"/" + self.basename + "XXXXX.jpg")
+        logging.info("Info: Number of last existing file: " + str(self.counter))
+        logging.info("Info: Saving assembled pictures as: " + self.dirname +"/" + self.basename + "XXXXX.jpg")
 
     def is_deleted(self, idx):
         return idx in self.deleted
@@ -145,13 +145,13 @@ class Photobooth:
         if _has_cups:
             self.cups_conn=cups.Connection()
             printers=self.cups_conn.getPrinters()
-            print("found printers: "+",".join(printers.keys()))
+            logging.info("found printers: "+",".join(printers.keys()))
             if printer_name is not None and printer_name in printers.keys():
                 self.printer=printer_name
-                print("found specified printer "+printer_name)
+                logging.info("found specified printer "+printer_name)
             else:
                 self.printer=None
-                if printer_name is not None: print(printer_name +" not found")
+                if printer_name is not None: logging.info(printer_name +" not found")
         else:
             self.printer=None
 
@@ -217,7 +217,7 @@ class Photobooth:
         self.display.gpio.set_output(GPIO_LAMP, 1)
         self.running=True
         while self.running:
-            print ("ready for next action!")
+            logging.info("ready for next action!")
             try:
                 self.current_page.next_action()
                # Catch exceptions and display message
@@ -229,7 +229,7 @@ class Photobooth:
                 raise
             except Exception as e:
                 msg='SERIOUS ERROR: ' + repr(e)
-                print(msg)
+                logging.info(msg)
                 self.errors.append(PhotoboothException(msg))
                 self.current_page.next_action = self.show_error
 
@@ -315,11 +315,11 @@ class DisplayPage:
         e = self.display.wait_for_event(self.timer)
         while not self.handle_event(e):
             e = self.display.wait_for_event(self.timer)
-        print("leaving loop" )
+        logging.info("leaving loop" )
 
     def handle_event(self,event):
         action = event.get_action()
-        print(self.name + " handles "+str(event))
+        logging.info(self.name + " handles "+str(event))
         if event.get_type() == 'global':
             self.next_action=self.teardown
         elif action is not None and len(self.options) > action and self.options[action] is not None:
@@ -340,7 +340,7 @@ class PhotobothPage(DisplayPage):
 
     def handle_event(self,event):
         action = event.get_action()
-        print(self.name + " handles "+str(event) + " -> "+str(action))
+        logging.info(self.name + " handles "+str(event) + " -> "+str(action))
         if event.get_type() == 'global':
             if event.value is 0:
                 self.next_action=self.teardown
@@ -407,7 +407,7 @@ class SlideshowPage(PhotobothPage):
             self.next_action=self.jump_image_fwd
             self.start()
         else:
-            print("No Photos - skipping slideshow")
+            logging.info("No Photos - skipping slideshow")
             self.next_action=pb.show_main
 
 
@@ -443,7 +443,7 @@ class SlideshowPage(PhotobothPage):
         self.jump_image(self.bigjump)
     def jump_image(self, jump):
         self._jump_image(jump)
-        print("photo idx: {}".format(self.photo_idx))
+        logging.info("photo idx: {}".format(self.photo_idx))
         self.bg = self.image_list.get(self.photo_idx)
         self.apply()
         self.wait_for_event()
@@ -531,7 +531,7 @@ class ShootingPage(PhotobothPage):
                 pb.bubble_canon.start_bubbles(self.n_pic*(self.posing_timer+3)+4)
                 self.bg=pb.theme.get_file_name("bubbles", ".jpg")
             else:
-                print("I would have loved to make bubbles... :-(")
+                logging.info("I would have loved to make bubbles... :-(")
         self.apply()
 
         self.wait_for_event()
@@ -541,7 +541,7 @@ class ShootingPage(PhotobothPage):
         self.display.clear()
         for i in range(self.n_pic):
             self.prev_cam.start_preview_stream()
-            print("taking picture {}/{}".format(i+1, self.n_pic))
+            logging.info("taking picture {}/{}".format(i+1, self.n_pic))
             t0=time()
             countdown=self.posing_timer
             frameC=0
@@ -558,7 +558,7 @@ class ShootingPage(PhotobothPage):
                 r , event = self.display.check_for_event()
                 if r:
                     self.handle_event(event) #no events defined but anyway
-            print("preview framerate: {} fps".format(frameC/(time()-t0)))
+            logging.info("preview framerate: {} fps".format(frameC/(time()-t0)))
             self.prev_cam.stop_preview_stream()
             self.display.clear()
             self.display.show_message("smile ;-)")
@@ -606,7 +606,7 @@ class ResultPage(PhotobothPage):
         self.display.apply()
 
     def delete_pic(self):
-        print("delete")
+        logging.info("delete")
         self.pb.pictures.delete_pic(self.photo_idx)
 
         self.display.show_message("delete picture")
@@ -624,7 +624,7 @@ class ResultPage(PhotobothPage):
         #try:
         #    subprocess.check_call(["lpr",  self.bg,  "-P", self.pb.printer])
         #except subprocess.CalledProcessError as e:
-        #    print(e)
+        #    logging.info(e)
         try:
             self.pb.cups_conn.printFile(self.pb.printer, self.bg, " ", {})
         except:
@@ -747,7 +747,7 @@ class SettingsPage(PhotobothPage):
         self.start()
 
     def del_printjobs(self):
-        print("TODO: implement reset of printing queue")
+        logging.info("TODO: implement reset of printing queue")
         self.start()
 
 class LayoutPage(PhotobothPage):
@@ -862,7 +862,7 @@ class TimePage(DisplayPage):
             self.t += relativedelta(months=dif)
         else:
             self.t += relativedelta(years=dif)
-        print("changed date")
+        logging.info("changed date")
         self.start()
 
     def up(self, i):
@@ -888,7 +888,7 @@ def internet_time(NTP_SERVER = '0.uk.pool.ntp.org'):
         data, address = client.recvfrom(1024)
     except:
         return False
-    #if data: print('Response received from:', address)
+    #if data: logging.info('Response received from:', address)
     t = struct.unpack('!12I', data)[10] - TIME1970
     return datetime.datetime.fromtimestamp(t)
 
@@ -906,7 +906,7 @@ def main(args):
     #if True:
     if not t:
         t=display_time(args.display_size, args.fullscreen)
-    print("Time: {}:".format(t))
+    logging.info("Time: {}:".format(t))
     picture_basename = t.strftime("%Y-%m-%d/photobooth_%Y-%m-%d_")
     photobooth = Photobooth(args.display_size, picture_basename, args.image_size, args.preview_size, args.pose_time, args.display_time,
                              args.slideshow_time, printer_name=args.printer)
@@ -935,7 +935,7 @@ if __name__ == "__main__":
     parser.add_argument('-dt','--display_time',metavar='<int>',type=int, help="Display time for assembled picture", default=10)
     parser.add_argument('--printer',metavar='<NAME>', help="Name of CUPS printer", default="Canon_SELPHY_CP1300")
     args = parser.parse_args()
-    print("args:")
+    logging.info("args:")
     for arg in vars(args):
-        print ("{}: {}".format(arg, getattr(args, arg)))
+        logging.info("{}: {}".format(arg, getattr(args, arg)))
     exit(main(args))

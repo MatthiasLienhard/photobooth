@@ -1,5 +1,5 @@
 from time import time, sleep
-
+import logging
 try:
 
     from bluepy import btle
@@ -18,7 +18,7 @@ class BubbleCanon:
         
     def scan(self, name="BubbleCannon", timeout=6, limitone=False):
         if not ble_support:
-            print("no ble support")
+            logging.info("no ble support")
             return False
         scanner = btle.Scanner() #.withDelegate(ScanDelegate())
         t0=time()    
@@ -50,7 +50,7 @@ class BubbleCanon:
             ch = self.conn.getCharacteristics(uuid=self.write_uuid)[0]
             if s > 255: 
                 s=255
-            print("Bubbles for {} seconds".format(s))
+            logging.info("Bubbles for {} seconds".format(s))
             ch.write(bytes([1,s]))
             return True
         return False
@@ -91,13 +91,13 @@ class BubbleCanon:
             for svc in self.conn.services:
                 print(str(svc), ":")
                 for ch in svc.getCharacteristics():
-                    print("    {}, hnd={}, supports {}".format(ch, hex(ch.handle), ch.propertiesToString()))
+                    logging.info("    {}, hnd={}, supports {}".format(ch, hex(ch.handle), ch.propertiesToString()))
                     chName = btle.AssignedNumbers.getCommonName(ch.uuid)
                     if (ch.supportsRead()):
                         try:
-                            print("    ->", repr(ch.read()))
+                            logging.info("    ->"+ repr(ch.read()))
                         except btle.BTLEException as e:
-                            print("    ->", e)
+                            logging.warning("    ->"+ e)
 
 
 

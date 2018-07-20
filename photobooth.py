@@ -644,7 +644,7 @@ class SettingsPage(PhotobothPage):
     def __init__(self, pb):
         options=[pb.show_main, pb.show_main, pb.show_layout, pb.show_filter, self.zoom_out, self.zoom_in,
                  self.next_theme, self.prev_theme, self.del_printjobs,self.bubble_connect, self.bubble_down, self.bubble_up,
-                 self.time_up, self.time_down, pb.teardown]
+                 self.time_down, self.time_up, pb.teardown]
         PhotobothPage.__init__(self, "Settings", pb, options, pb.screensaver_timer)
         self.themes=os.listdir('themes')
         self.theme_idx=self.themes.index(self.pb.theme.name)

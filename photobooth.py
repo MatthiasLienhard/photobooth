@@ -608,7 +608,9 @@ class ResultPage(PhotobothPage):
     def delete_pic(self):
         logging.info("delete")
         self.pb.pictures.delete_pic(self.photo_idx)
-
+        self.display.clear()
+        if self.bg is not None:
+            self.display.show_picture(self.bg, size=self.display.get_size(), adj=(1, 1))
         self.display.show_message("delete picture")
         self.display.apply()
 
@@ -620,6 +622,10 @@ class ResultPage(PhotobothPage):
 
 
     def print_pic(self):
+        self.display.clear()
+        if self.bg is not None:
+            self.display.show_picture(self.bg, size=self.display.get_size(), adj=(1, 1))
+        self.display.apply()
         #lpr filename.jpg -P Canon_SELPHY_CP1300
         #try:
         #    subprocess.check_call(["lpr",  self.bg,  "-P", self.pb.printer])

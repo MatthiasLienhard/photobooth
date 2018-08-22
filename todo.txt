@@ -13,3 +13,21 @@ Einstellungen der kamera (sony alpha):
 
 
 
+printer options in settings:
+    * autoprint
+    * show warnings
+        * find out when printer is off
+        * find out when paper/inc is empty
+        * other issues? "busy"
+    * delete all print jobs (and show number of waiting jobs)
+
+camera options in settings:
+    * show %battery
+    * warn when low
+    * handle error when swiching off
+
+slideshow layout:
+
+result layout: disable buttons when button has been pressed
+
+

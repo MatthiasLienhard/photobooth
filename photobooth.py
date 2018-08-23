@@ -238,17 +238,18 @@ class Photobooth:
             # Do not catch KeyboardInterrupt and SystemExit
             except (KeyboardInterrupt, SystemExit):
                 raise
-            except Exception as e:
-                msg='SERIOUS ERROR: ' + repr(e)
-                logging.info(msg)
-                self.errors.append(PhotoboothException(msg))
-                self.current_page.next_action = self.show_error
+            #except Exception as e:
+            #    msg='SERIOUS ERROR: ' + repr(e)
+            #    logging.info(msg)
+            #    self.errors.append(PhotoboothException(msg))
+            #    self.current_page.next_action = self.show_error
 
             #    self.teardown()
 
     def teardown(self):
         self.display.clear()
         self.display.show_message("Shutting down...")
+        # todo show also self.erros if any
         self.display.apply()
         self.display.gpio.set_output(GPIO_LAMP, 0)
         self.bubble_canon.disconnect()
@@ -764,7 +765,16 @@ class SettingsPage(PhotobothPage):
         self.start()
 
     def del_printjobs(self):
-        logging.info("TODO: implement reset of printing queue")
+        logging.info("cancel all print jobs in queue")
+        nqueue = len(self.pb.cups_conn.getJobs())
+        if nqueue>0 :
+            attr=self.pb.cups_conn.getPrinterAttributes(self.pb.printer)
+            logging.info("cancle {} jobs in printing queue".format(nqueue))
+            #self.pb.cups_conn.cancelAllJobs(attr['device-uri'])
+            for j in self.pb.cups_conn.getJobs().keys():
+                self.pb.cups_conn.cancelJob(j)
+        else:
+            logging.info("no jobs in printing queue")
         self.start()
 
 class LayoutPage(PhotobothPage):

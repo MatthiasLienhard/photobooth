@@ -182,10 +182,21 @@ class Photobooth:
         ready=False
         if self.printer is not None:
             attr = self.cups_conn.getPrinterAttributes(self.printer)
-            msg = attr['printer-state-message']
-            if msg != 'Unplugged or turned off':
-                ready = True
-        return ready, msg
+            reasons=attr['printer-state-reasons']
+            msg=attr['printer-state-message']
+            nqueue=attr['queued-job-count']
+            stateID=attr['printer-state']
+            epolicy=attr['printer-error-policy']
+            state=['0','1','2','idle','4','stopped','6','7']
+            if stateID ==3 : #3= idle, 5=stopped
+                ready=True
+            else:
+                ready=False
+
+            if msg == 'Unplugged or turned off':
+                ready = False
+            ret_msg=state[stateID]+" queue: {} ".format(nqueue)+",".join(reasons)+" "+msg
+        return ready, ret_msg
 
     def set_layout(self):
         self.layout = Layout(self.layout_sel, size=self.picture_size, filter_type=self.filter_sel)

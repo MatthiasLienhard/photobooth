@@ -20,7 +20,7 @@ class Layout:
     def get_npic(self):
         return(self.n_picture-len(self.decorations))
 
-    def get_image_pos_and_size(self,field=0, grid_dim=4 , ratio=3/2,rotate=False, total_size=None, frame_rel=None, adj=(1,1)):
+    def get_image_pos_and_size(self,field=0, grid_dim=(2,2) , ratio=3/2,rotate=False, total_size=None, frame_rel=None, adj=(1,1)):
         if total_size is None:
             total_size=self.size
         if frame_rel is None:
@@ -54,18 +54,22 @@ class Layout:
             n=n_picture[layout_type]-1
             for i in range(n):
                 offset[i],img_size[i]=self.get_image_pos_and_size(i,grid_dim=n, ratio=ratio[layout_type], rotate=rotate[layout_type], total_size=s)
-            if layout_type==4:
-                decorations.append("decoration_vertical")
+            if layout_type in (2,3,4):
+                if rotate[layout_type]:
+                    decorations.append("decoration_vertical")
+                else:
+                    decorations.append("decoration_horizontal")
                 offset[n],img_size[n]=self.get_image_pos_and_size(0,grid_dim=1, ratio=1024/130, rotate=rotate[layout_type], total_size=s)
+                # place big decoration right in the center
             else:
                 decorations.append("decoration_square")
-                offset[n],img_size[n]=self.get_image_pos_and_size(15,grid_dim=16, ratio=1, rotate=rotate[layout_type], total_size=s)
+                offset[n],img_size[n]=self.get_image_pos_and_size(23,grid_dim=(6, 4), ratio=1, rotate=rotate[layout_type], total_size=s, frame_rel=self.frame_rel/2)
             #logging.info("layout {}: {} - {} - {} - {}".format(layout_type,n_picture[layout_type],img_size,offset,rotate[layout_type]))
         elif layout_type==5:
             offset[0],img_size[0] =self.get_image_pos_and_size(0,grid_dim=(1, 2), ratio=1, rotate=rotate[layout_type], total_size=s,adj=(0,1))
             offset[1],img_size[1] =self.get_image_pos_and_size(1,grid_dim=(1, 2), ratio=1, rotate=rotate[layout_type], total_size=s,adj=(0,1))
             offset[2],img_size[2] =self.get_image_pos_and_size(0,grid_dim=(1, 1), ratio=1, rotate=rotate[layout_type], total_size=s,adj=(2,1))
-            offset[3],img_size[3]=self.get_image_pos_and_size(15,grid_dim=16, ratio=1, rotate=rotate[layout_type], total_size=s)
+            offset[3],img_size[3]=self.get_image_pos_and_size(23,grid_dim=(6, 4), ratio=1, rotate=rotate[layout_type], total_size=s, frame_rel=self.frame_rel/2)
             decorations.append("decoration_square")
         elif layout_type==6:
             offset[0],img_size[0] =self.get_image_pos_and_size(0,grid_dim=(1, 2), ratio=2.9, rotate=rotate[layout_type], total_size=s,adj=(0,1))

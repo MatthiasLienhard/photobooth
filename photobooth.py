@@ -198,6 +198,17 @@ class Photobooth:
             ret_msg=state[stateID]+" queue: {} ".format(nqueue)+",".join(reasons)+" "+msg
         return ready, ret_msg
 
+    def cancel_printjobs(self):
+        nqueue = len(self.cups_conn.getJobs())
+        if nqueue>0 :
+            logging.info("cancle {} jobs in printing queue".format(nqueue))
+            #attr=self.cups_conn.getPrinterAttributes(self.printer)
+
+            #self.pb.cups_conn.cancelAllJobs(attr['device-uri'])
+            for j in self.cups_conn.getJobs().keys():
+                self.cups_conn.cancelJob(j)
+
+
     def set_layout(self):
         self.layout = Layout(self.layout_sel, size=self.picture_size, filter_type=self.filter_sel)
 
@@ -430,7 +441,7 @@ class SlideshowPage(PhotobothPage):
         self.display.show_message("#{}".format(self.photo_idx), font_size=self.overlay_text_size, adj=(0,0))
         self.display.add_button(img_fn=self.pb.theme.get_file_name("left_button"), size=(50,50), adj=(0,1),action_value=2)
         self.display.add_button(img_fn=self.pb.theme.get_file_name("right_button"), size=(50,50), adj=(2,1),action_value=3)
-        self.display.add_button(img_fn=self.pb.theme.get_file_name("check"), size=(50,50), adj=(2,2),action_value=4)
+        self.display.add_button(img_fn=self.pb.theme.get_file_name("picture_opt"), size=(50,50), adj=(2,2),action_value=4)
 
         self.display.apply()
     def show_result(self):
@@ -482,7 +493,7 @@ class MainPage(PhotobothPage):
         PhotobothPage.__init__(self, "Main", pb)
         self.timer=pb.screensaver_timer
         self.options=[pb.show_slideshow,pb.show_shooting, self.toggle_filter, self.toggle_layout,
-             pb.show_settings] #todo: add camera opt
+             pb.show_settings,pb.show_slideshow] #todo: add camera opt
         self.overlay_text="Main Menue"
         self.example_img_raw = open_images([self.pb.theme.get_file_name("test_picture", ".jpg")])
         if not self.pb.layout_options[self.pb.layout_sel]:
@@ -503,7 +514,10 @@ class MainPage(PhotobothPage):
         self.display.add_button(action_value=2, adj=(0, 2), img_fn=self.pb.theme.get_file_name("filter_options"))
         self.display.add_button(action_value=3, adj=(2, 2), img_fn=self.pb.theme.get_file_name("layout_options"))
         self.display.add_button(action_value=1, adj=(1, 2), img_fn=self.pb.theme.get_file_name("button"))
-        self.display.add_button(action_value=4, adj=(2, 0), img_fn=self.pb.theme.get_file_name("settings"), size=(70,70))
+        self.display.add_button(action_value=4, adj=(2, 0), img_fn=self.pb.theme.get_file_name("settings"),
+                                size=(70, 70))
+        self.display.add_button(action_value=5, adj=(0, 0), img_fn=self.pb.theme.get_file_name("slideshow_icon"),
+                                size=(70, 70))
         self.display.apply()
 
     def set_example_img(self):
@@ -644,6 +658,7 @@ class ResultPage(PhotobothPage):
         #except subprocess.CalledProcessError as e:
         #    logging.info(e)
         try:
+            self.pb.cancel_printjobs()
             self.pb.cups_conn.printFile(self.pb.printer, self.bg, " ", {})
         except:
             raise #todo: what can go wrong here?
@@ -653,7 +668,7 @@ class ResultPage(PhotobothPage):
 
         #self.display.show_message("start printing...")
         attr=self.pb.cups_conn.getPrinterAttributes(self.pb.printer)
-        self.display.show_message(attr['printer-state-message'])
+        self.display.show_message(attr['printer-state-message'], font_size=50)
         self.display.apply()
         sleep(2)
         self.next_action = self.pb.show_main()
@@ -696,7 +711,7 @@ class SettingsPage(PhotobothPage):
         self.display.show_message("Printer:", font_size=50, pos=(cols[1],rows[3]), adj=(1,1) )
         self.display.add_button(action_value=8, pos=(cols[2], rows[3]), adj=(1,1),size=[b_size, b_size], img_fn=self.pb.theme.get_file_name("printer"))
         p_reay, p_msg=self.pb.get_printer_state()
-        self.display.show_message(p_msg, font_size=50, pos=(cols[3], rows[3]), adj=(1, 1))
+        self.display.show_message(p_msg, font_size=50, pos=((cols[2]+cols[3])/2, rows[3]), adj=(2, 1))
 
         self.display.show_message("Bubble gun:", font_size=50, pos=(cols[1],rows[4]),  adj=(1,1) )
         self.display.add_button(action_value=9, pos=(cols[2], rows[4]), adj=(1,1),size=[b_size, b_size], img_fn=self.pb.theme.get_file_name("ble"))
@@ -765,16 +780,7 @@ class SettingsPage(PhotobothPage):
         self.start()
 
     def del_printjobs(self):
-        logging.info("cancel all print jobs in queue")
-        nqueue = len(self.pb.cups_conn.getJobs())
-        if nqueue>0 :
-            attr=self.pb.cups_conn.getPrinterAttributes(self.pb.printer)
-            logging.info("cancle {} jobs in printing queue".format(nqueue))
-            #self.pb.cups_conn.cancelAllJobs(attr['device-uri'])
-            for j in self.pb.cups_conn.getJobs().keys():
-                self.pb.cups_conn.cancelJob(j)
-        else:
-            logging.info("no jobs in printing queue")
+        self.pb.cancel_printjobs()
         self.start()
 
 class LayoutPage(PhotobothPage):

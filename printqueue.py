@@ -43,7 +43,7 @@ class PrintQueue:
                 nqueue=attr['queued-job-count']
                 stateID=attr['printer-state']
                 epolicy=attr['printer-error-policy']
-                state=['0','1','2','idle','transfering','stopped','6','7']
+                state=['0','1','2','idle','transferring','stopped','6','7']
                 if stateID ==3 : #3= idle, 5=stopped
                     ready=True
                 else:
@@ -51,7 +51,13 @@ class PrintQueue:
 
                 if msg == 'Unplugged or turned off':
                     ready = False
-                ret_msg=state[stateID]+" queue: {} ".format(nqueue)+",".join(reasons)+" "+msg
+                #
+                if stateID ==3:
+                    ret_msg="printer OK"
+                else:
+                    ret_msg = state[stateID] + " queue: {} ".format(nqueue) + ",".join(reasons) + " " + msg
+                if len(self.queue)>0:
+                    ret_msg+="; {} pics in queue".format(len(self.queue))
             return ready, ret_msg
         else:
             return False, "for printer support, install pycups"

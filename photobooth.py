@@ -27,12 +27,9 @@ import random
 import sys
 import subprocess
 # import scipy.ndimage
-try:
-    import cups
-    _has_cups=True
-except ImportError:
-    _has_cups=False
-    logging.info("for printer support, install pycups")
+from printqueue import PrintQueue
+
+
 
 class PhotoboothException(Exception):
     """Custom exception class to handle camera class errors"""
@@ -142,18 +139,7 @@ class Photobooth:
         self.display=None
         self.display_size=display_size
         #self.init_display()
-        if _has_cups:
-            self.cups_conn=cups.Connection()
-            printers=self.cups_conn.getPrinters()
-            logging.info("found printers: "+",".join(printers.keys()))
-            if printer_name is not None and printer_name in printers.keys():
-                self.printer=printer_name
-                logging.info("found specified printer "+printer_name)
-            else:
-                self.printer=None
-                if printer_name is not None: logging.info(printer_name +" not found")
-        else:
-            self.printer=None
+        self.print_queue= PrintQueue(printer_name)
 
         self.pictures     = PictureList(picture_basename)
         self.picture_dir  = os.path.realpath(self.pictures.dirname)
@@ -177,36 +163,6 @@ class Photobooth:
         self.camera = camera.get_camera(picture_size, preview_size)
         # self.preview_camera=camera.get_camera(picture_size, preview_size,['picam', 'webcam', 'dslr','dummicam'], self.camera)
         self.preview_camera=camera.get_camera(picture_size, preview_size,default_cam=self.camera)
-    def get_printer_state(self):
-        msg = "no print support"
-        ready=False
-        if self.printer is not None:
-            attr = self.cups_conn.getPrinterAttributes(self.printer)
-            reasons=attr['printer-state-reasons']
-            msg=attr['printer-state-message']
-            nqueue=attr['queued-job-count']
-            stateID=attr['printer-state']
-            epolicy=attr['printer-error-policy']
-            state=['0','1','2','idle','4','stopped','6','7']
-            if stateID ==3 : #3= idle, 5=stopped
-                ready=True
-            else:
-                ready=False
-
-            if msg == 'Unplugged or turned off':
-                ready = False
-            ret_msg=state[stateID]+" queue: {} ".format(nqueue)+",".join(reasons)+" "+msg
-        return ready, ret_msg
-
-    def cancel_printjobs(self):
-        nqueue = len(self.cups_conn.getJobs())
-        if nqueue>0 :
-            logging.info("cancle {} jobs in printing queue".format(nqueue))
-            #attr=self.cups_conn.getPrinterAttributes(self.printer)
-
-            #self.pb.cups_conn.cancelAllJobs(attr['device-uri'])
-            for j in self.cups_conn.getJobs().keys():
-                self.cups_conn.cancelJob(j)
 
 
     def set_layout(self):
@@ -298,7 +254,7 @@ class Photobooth:
 
     def get_info_text(self):
         # todo: make better infotext
-        return("Camera: {}\n\n{}\n\nprinter: {}".format(self.camera_info(),self.pictures.get_info(),self.printer))
+        return("Camera: {}\n\n{}\n\nprinter: {}".format(self.camera_info(),self.pictures.get_info(),self.print_queue.get_printer_state()))
 
 #####################
 ### Display Pages ###
@@ -615,7 +571,7 @@ class ResultPage(PhotobothPage):
         img=self.file_name
 
         PhotobothPage.__init__(self, "Results", pb, options=opt, timer=timer, bg=img)
-        self.printer_ready, self.printer_message=self.pb.get_printer_state()
+        self.printer_ready, self.printer_message=self.pb.print_queue.get_printer_state()
         self.start()
 
     def apply(self):
@@ -658,8 +614,7 @@ class ResultPage(PhotobothPage):
         #except subprocess.CalledProcessError as e:
         #    logging.info(e)
         try:
-            self.pb.cancel_printjobs()
-            self.pb.cups_conn.printFile(self.pb.printer, self.bg, " ", {})
+            self.pb.print_queue.printFile( self.bg)
         except:
             raise #todo: what can go wrong here?
 
@@ -667,8 +622,8 @@ class ResultPage(PhotobothPage):
 
 
         #self.display.show_message("start printing...")
-        attr=self.pb.cups_conn.getPrinterAttributes(self.pb.printer)
-        self.display.show_message(attr['printer-state-message'], font_size=50)
+
+        self.display.show_message(self.pb.print_queue.get_printer_state(), font_size=50)
         self.display.apply()
         sleep(2)
         self.next_action = self.pb.show_main()
@@ -710,7 +665,7 @@ class SettingsPage(PhotobothPage):
         self.display.add_button(action_value=7, pos=(cols[3]+100, rows[2]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))
         self.display.show_message("Printer:", font_size=50, pos=(cols[1],rows[3]), adj=(1,1) )
         self.display.add_button(action_value=8, pos=(cols[2], rows[3]), adj=(1,1),size=[b_size, b_size], img_fn=self.pb.theme.get_file_name("printer"))
-        p_reay, p_msg=self.pb.get_printer_state()
+        p_reay, p_msg=self.pb.print_queue.get_printer_state()
         self.display.show_message(p_msg, font_size=50, pos=((cols[2]+cols[3])/2, rows[3]), adj=(2, 1))
 
         self.display.show_message("Bubble gun:", font_size=50, pos=(cols[1],rows[4]),  adj=(1,1) )
@@ -780,7 +735,7 @@ class SettingsPage(PhotobothPage):
         self.start()
 
     def del_printjobs(self):
-        self.pb.cancel_printjobs()
+        self.pb.print_queue.cancel_printjobs()
         self.start()
 
 class LayoutPage(PhotobothPage):

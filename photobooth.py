@@ -132,7 +132,8 @@ class Photobooth:
     """
 
     def __init__(self, display_size, picture_basename, picture_size, preview_size,  pose_time, display_time,
-                 slideshow_display_time, printer_name=None, theme="default", bubble_prob=0):
+                 slideshow_display_time, printer_name=None, theme="default", bubble_prob=0,
+                 cam_list=['sony_wifi','picam', 'webcam', 'dslr','dummicam']):
         self.start_info_timer=5
         self.screensaver_timer=30
         self.slideshow_timer=slideshow_display_time
@@ -160,9 +161,9 @@ class Photobooth:
         self.errors=[]
         self.current_page=None
 
-        self.camera = camera.get_camera(picture_size, preview_size)
+        self.camera = camera.get_camera(picture_size, preview_size, priority_list=cam_list)
         # self.preview_camera=camera.get_camera(picture_size, preview_size,['picam', 'webcam', 'dslr','dummicam'], self.camera)
-        self.preview_camera=camera.get_camera(picture_size, preview_size,default_cam=self.camera)
+        self.preview_camera=camera.get_camera(picture_size, preview_size, priority_list=cam_list,default_cam=self.camera)
 
 
     def set_layout(self):
@@ -670,7 +671,10 @@ class SettingsPage(PhotobothPage):
 
         self.display.show_message("Bubble gun:", font_size=50, pos=(cols[1],rows[4]),  adj=(1,1) )
         self.display.add_button(action_value=9, pos=(cols[2], rows[4]), adj=(1,1),size=[b_size, b_size], img_fn=self.pb.theme.get_file_name("ble"))
-        if self.pb.bubble_canon.has_connection():
+        if not self.pb.bubble_canon.is_supported():
+            self.display.show_message("no ble support", font_size=50, pos=((cols[2]+cols[3])/2, rows[4]), adj=(2, 1))
+
+        elif self.pb.bubble_canon.has_connection():
             self.display.add_button(action_value=10, pos=(cols[3]-75, rows[4]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("left_button"))
             self.display.add_button(action_value=11, pos=(cols[3]+75, rows[4]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))
             self.display.show_message("{} %".format(self.pb.bubble_prob), font_size=50, pos=(cols[3],rows[4]),  adj=(1,1) )
@@ -692,10 +696,11 @@ class SettingsPage(PhotobothPage):
         self.next_action = self.pb.show_settings()
 
     def bubble_connect(self):
-        self.display.show_message("scanning...", font_size=50, pos=self.get_pos((3,4), dim=(6,6), frame=(0,0,0,0)),  adj=(1,1) )
-        self.display.apply()
-        self.pb.bubble_canon.scan()
-        self.pb.bubble_canon.connect()
+        if self.pb.bubble_canon.is_supported():
+            self.display.show_message("scanning...", font_size=50, pos=self.get_pos((3,4), dim=(6,6), frame=(0,0,0,0)),  adj=(1,1) )
+            self.display.apply()
+            self.pb.bubble_canon.scan()
+            self.pb.bubble_canon.connect()
         self.next_action = self.pb.show_settings()
     def time_up(self):
         self.pb.pose_time+=1;
@@ -897,7 +902,7 @@ def main(args):
     logging.info("Time: {}:".format(t))
     picture_basename = t.strftime("%Y-%m-%d/photobooth_%Y-%m-%d_")
     photobooth = Photobooth(args.display_size, picture_basename, args.image_size, args.preview_size, args.pose_time, args.display_time,
-                             args.slideshow_time, printer_name=args.printer)
+                             args.slideshow_time, printer_name=args.printer, theme=args.theme, cam_list=args.cam)
     photobooth.run(fullscreen=args.fullscreen, hide_mouse= not args.mouse)
     return 0
 
@@ -921,6 +926,8 @@ if __name__ == "__main__":
     parser.add_argument('-pt','--pose_time',metavar='<int>',type=int, help="countdown time", default=3)
     parser.add_argument('-st','--slideshow_time',metavar='<int>',type=int, help="Display time of pictures in the slideshow", default=5)
     parser.add_argument('-dt','--display_time',metavar='<int>',type=int, help="Display time for assembled picture", default=10)
+    parser.add_argument('--theme',metavar='<string>',type=str, help="display theme name", default="default")
+    parser.add_argument('--cam',metavar='list of <string>',type=str, help="cameras to use", nargs="+", default=['sony_wifi','picam', 'webcam', 'dslr','dummicam'])
     parser.add_argument('--printer',metavar='<NAME>', help="Name of CUPS printer", default="Canon_SELPHY_CP1300")
     args = parser.parse_args()
     logging.info("args:")

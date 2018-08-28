@@ -67,10 +67,13 @@ class BubbleCanon:
         except btle.BTLEException:
             return False
 
+    def is_supported(self):
+        return ble_support
+
     def connect(self):
         # connect to BLE
         if not ble_support:
-            print("no ble support")
+            logging.info("no ble support")
             return False
         try:
             self.conn = btle.Peripheral(self.addr, "random")
@@ -86,7 +89,7 @@ class BubbleCanon:
 
     def list_services(self):
         if not ble_support:
-            print("no ble support")
+            logging.info("no ble support")
         else:
             for svc in self.conn.services:
                 print(str(svc), ":")

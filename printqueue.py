@@ -5,10 +5,15 @@ try:
 except ImportError:
     _has_cups=False
     logging.info("for printer support, install pycups")
+import threading
 
 class PrintQueue:
     def __init__(self, printer_name):
         if _has_cups:
+            self.count=0
+            self.printing=False
+            self.print_time=60 # time in seconds
+            self.queue=[]
             self.cups_conn = cups.Connection()
             printers = self.cups_conn.getPrinters()
             logging.info("found printers: " + ",".join(printers.keys()))
@@ -66,7 +71,24 @@ class PrintQueue:
 
     def printFile(self, file):
         if _has_cups:
-            self.cancel_printjobs()
-            self.cups_conn.printFile(self.printer, file, " ", {})
+            self.count+=1
+            self.queue.append( file)
+            if not self.printing:
+                self.print_next()
+            else:
+                self.cancel_printjobs()
+                self.cups_conn.printFile(self.printer, file, " ", {})
+                t = threading.Timer(self.print_time, self.print_next)
+                t.start()
         else:
             logging.info("for printer support, install pycups")
+
+    def print_next(self):
+        self.cancel_printjobs()
+        if len(self.queue) > 0:
+            self.cups_conn.printFile(self.printer, self.queue.pop(), " ", {})
+            self.printing=True
+            t = threading.Timer(self.print_time, self.print_next)
+            t.start()
+        else:
+            self.printing=False

@@ -373,12 +373,14 @@ class Camera_gPhoto(Camera):
 
 def get_camera(picture_size, preview_size,priority_list=['sony_wifi','webcam', 'dslr', 'picam', 'webcam', 'dummicam'], default_cam=None):
     for type in priority_list:
-        if default_cam is not None and default_cam.type is type:
+        if default_cam is not None and default_cam.type == type:
             return default_cam
         else:
             cam=_get_camera(picture_size, preview_size, type)
             if cam is not None:
+                logging.info("found "+cam.type)
                 return cam
+    raise CameraException("specified camera not found...")
 
 def _get_camera(picture_size, preview_size, type):
     logging.info("try to get camera of type "+type)

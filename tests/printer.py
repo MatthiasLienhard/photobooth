@@ -1,15 +1,15 @@
 #from escpos.connections import getUSBPrinter
-from photobooth import PictureList
+#from photobooth import PictureList
 import os
 import cups
 from time import sleep
 
 from datetime import datetime
 
-os.chdir("/home/matthias/projects/github/photobooth")
+os.chdir("/home/pi/Pictures")
 #picture_basename = datetime.now().strftime("%Y-%m-%d/photobooth_%Y-%m-%d_")
-picture_basename = "2018-07-19/photobooth_2018-07-19"
-list=PictureList(picture_basename)
+#picture_basename = "2018-07-19/photobooth_2018-07-19"
+#list=PictureList(picture_basename)
 
 
 
@@ -35,24 +35,20 @@ else:
     raise Exception(printer_name + " not found")
 
 
-files=["/home/matthias/"]
-
+files=["DSCN4503.jpg","DSCN4554.jpg","DSCN4645.jpg","FHD0671.jpg"]
 #print_id=cups_conn.printFile(printer, list.get(0), " ", {})
 print_id=cups_conn.printFile(printer, files[0], " ", {})
 print_id=cups_conn.printFile(printer, files[1], " ", {})
-
 
 print("start printing...")
 while True:
     attr = cups_conn.getPrinterAttributes(printer)
     printqueuelength = len(cups_conn.getJobs())
-
     print(",".join(attr['printer-state-reasons']))#=['paused']
     print(attr['printer-state-message'])#: '',
     print(attr['queued-job-count'])##=2
     print(attr['printer-state'])##=5
     print(attr['printer-error-policy'])#: 'retry-job',
-
-    sleep(.1)
+    sleep(1)
 
 

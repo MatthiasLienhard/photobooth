@@ -52,8 +52,8 @@ class PrintQueue:
                 if msg == 'Unplugged or turned off':
                     ready = False
                 #
-                ret_msg = state[stateID] + " queue: {} ".format(nqueue) + ",".join(reasons) + " " + msg
-            return ready, ret_msg
+                ret_msg = state[stateID] + " "+ ",".join(reasons) + " queue: {} ".format(nqueue) + " "+ msg
+            return True, ret_msg
         else:
             return False, "for printer support, install pycups"
 

@@ -43,7 +43,7 @@ class PrintQueue:
                 nqueue=attr['queued-job-count']
                 stateID=attr['printer-state']
                 epolicy=attr['printer-error-policy']
-                state=['0','1','2','idle','transferring','stopped','6','7']
+                state=['0','1','2','idle','printing','stopped','6','7']
                 if stateID ==3 : #3= idle, 5=stopped
                     ready=True
                 else:
@@ -52,12 +52,7 @@ class PrintQueue:
                 if msg == 'Unplugged or turned off':
                     ready = False
                 #
-                if stateID ==3:
-                    ret_msg="printer OK"
-                else:
-                    ret_msg = state[stateID] + " queue: {} ".format(nqueue) + ",".join(reasons) + " " + msg
-                if len(self.queue)>0:
-                    ret_msg+="; {} pics in queue".format(len(self.queue))
+                ret_msg = state[stateID] + " queue: {} ".format(nqueue) + ",".join(reasons) + " " + msg
             return ready, ret_msg
         else:
             return False, "for printer support, install pycups"
@@ -71,6 +66,10 @@ class PrintQueue:
 
                 #self.pb.cups_conn.cancelAllJobs(attr['device-uri'])
                 for j in self.cups_conn.getJobs().keys():
+                    attr=self.cups_conn.getJobAttributes(j)
+
+                    logging.info("cancel job {}: {}: {}".format(j, attr['document-name-supplied'],
+                                                                attr['job-printer-state-message']))
                     self.cups_conn.cancelJob(j)
         else:
             logging.info("for printer support, install pycups")
@@ -78,23 +77,7 @@ class PrintQueue:
     def printFile(self, file):
         if _has_cups:
             self.count+=1
-            self.queue.append( file)
-            if not self.printing:
-                self.print_next()
-            else:
-                self.cancel_printjobs()
-                self.cups_conn.printFile(self.printer, file, " ", {})
-                t = threading.Timer(self.print_time, self.print_next)
-                t.start()
+            self.cups_conn.printFile(self.printer, file, " ", {})
         else:
             logging.info("for printer support, install pycups")
 
-    def print_next(self):
-        self.cancel_printjobs()
-        if len(self.queue) > 0:
-            self.cups_conn.printFile(self.printer, self.queue.pop(), " ", {})
-            self.printing=True
-            t = threading.Timer(self.print_time, self.print_next)
-            t.start()
-        else:
-            self.printing=False

@@ -17,7 +17,7 @@ os.chdir("/home/pi/Pictures")
 # e.g. Bus 003 Device 003: ID 1504:0006
 # lsusb -vvv -d 1504:0006 | grep bEndpointAddress | grep IN
 # bEndpointAddress     0x81  EP 1 IN
-#printer = getUSBPrinter()(idVendor=0x04a9,
+#printer =(idVendor=0x04a9,
 #                          idProduct=0x32db,
 #                          inputEndPoint=0x82,
 #                          outputEndPoint=0x01)
@@ -37,12 +37,15 @@ else:
 
 files=["DSCN4503.jpg","DSCN4554.jpg","DSCN4645.jpg","FHD0671.jpg"]
 #print_id=cups_conn.printFile(printer, list.get(0), " ", {})
-print_id=cups_conn.printFile(printer, files[0], " ", {})
-print_id=cups_conn.printFile(printer, files[1], " ", {})
+print_id=cups_conn.printFile(printer, files[2], " ", {})
+print_id=cups_conn.printFile(printer, files[3], " ", {})
 
 print("start printing...")
 while True:
     attr = cups_conn.getPrinterAttributes(printer)
+    job = cups_conn.getJobAttributes(print_id)
+    print("job {}: {}: {}".format(print_id, job['job-printer-state-message'],job['job-state-reasons']))
+                                                #attr['job-printer-state-message']))
     printqueuelength = len(cups_conn.getJobs())
     print(",".join(attr['printer-state-reasons']))#=['paused']
     print(attr['printer-state-message'])#: '',

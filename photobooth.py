@@ -623,8 +623,8 @@ class ResultPage(PhotobothPage):
 
 
         #self.display.show_message("start printing...")
-
-        self.display.show_message(self.pb.print_queue.get_printer_state(), font_size=50)
+        p_ready, p_msg = self.pb.print_queue.get_printer_state()
+        self.display.show_message(p_msg, font_size=50)
         self.display.apply()
         sleep(2)
         self.next_action = self.pb.show_main()
@@ -666,7 +666,7 @@ class SettingsPage(PhotobothPage):
         self.display.add_button(action_value=7, pos=(cols[3]+100, rows[2]), adj=(1,1),size=[b_size,b_size], img_fn=self.pb.theme.get_file_name("right_button"))
         self.display.show_message("Printer:", font_size=50, pos=(cols[1],rows[3]), adj=(1,1) )
         self.display.add_button(action_value=8, pos=(cols[2], rows[3]), adj=(1,1),size=[b_size, b_size], img_fn=self.pb.theme.get_file_name("printer"))
-        p_reay, p_msg=self.pb.print_queue.get_printer_state()
+        p_ready, p_msg=self.pb.print_queue.get_printer_state()
         self.display.show_message(p_msg, font_size=50, pos=((cols[2]+cols[3])/2, rows[3]), adj=(2, 1))
 
         self.display.show_message("Bubble gun:", font_size=50, pos=(cols[1],rows[4]),  adj=(1,1) )

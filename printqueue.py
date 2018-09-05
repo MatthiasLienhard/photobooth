@@ -67,9 +67,11 @@ class PrintQueue:
                 #self.pb.cups_conn.cancelAllJobs(attr['device-uri'])
                 for j in self.cups_conn.getJobs().keys():
                     attr=self.cups_conn.getJobAttributes(j)
-
-                    logging.info("cancel job {}: {}: {}".format(j, attr['document-name-supplied'],
-                                                                attr['job-printer-state-message']))
+                    msg="cancle job {}".format(j)
+                    if 'document-name-supplied' in attr.keys():
+                        msg += ": "+format(attr['document-name-supplied'])
+                    if 'job-printer-state-message' in attr.keys():
+                        msg += ": " + format(attr['job-printer-state-message'])
                     self.cups_conn.cancelJob(j)
         else:
             logging.info("for printer support, install pycups")

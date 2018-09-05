@@ -44,7 +44,7 @@ print("start printing...")
 while True:
     attr = cups_conn.getPrinterAttributes(printer)
     job = cups_conn.getJobAttributes(print_id)
-    print("job {}: {}: {}".format(print_id, job['job-printer-state-message'],job['job-state-reasons']))
+    print("job {}: {}: {}".format(print_id, job['job-state'],job['job-state-reasons']))
                                                 #attr['job-printer-state-message']))
     printqueuelength = len(cups_conn.getJobs())
     print(",".join(attr['printer-state-reasons']))#=['paused']

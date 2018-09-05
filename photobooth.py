@@ -206,17 +206,17 @@ class Photobooth:
             # Do not catch KeyboardInterrupt and SystemExit
             except (KeyboardInterrupt, SystemExit):
                 raise
-            #except Exception as e:
-            #    msg='SERIOUS ERROR: ' + repr(e)
-            #    logging.info(msg)
+            except Exception as e:
+                msg='SERIOUS ERROR: ' + repr(e)
+                logging.info(msg)
             #    self.errors.append(PhotoboothException(msg))
             #    self.current_page.next_action = self.show_error
 
-            #    self.teardown()
+                self.teardown(msg)
 
-    def teardown(self):
+    def teardown(self, msg="Shutting down..."):
         self.display.clear()
-        self.display.show_message("Shutting down...")
+        self.display.show_message(msg)
         # todo show also self.erros if any
         self.display.apply()
         self.display.gpio.set_output(GPIO_LAMP, 0)
@@ -582,7 +582,7 @@ class ResultPage(PhotobothPage):
         if self.overlay_text is not None:
             self.display.show_message(self.overlay_text, font_size=self.overlay_text_size)
         if self.printer_ready:
-            self.display.add_button(action_value=3, adj=(2, 2), img_fn=self.pb.theme.get_file_name("printer"))
+            self.display.add_button(action_value=3, adj=(2, 2), img_fn=self.pb.theme.get_file_name("printer"), size=(100,100))
         self.display.show_message(self.printer_message, adj=(2, 2), font_size=30)
         self.display.add_button(action_value=2, adj=(0, 2), img_fn=self.pb.theme.get_file_name("trashbin"), size=(100,100))
         self.display.add_button(action_value=1, adj=(1, 2), img_fn=self.pb.theme.get_file_name("button_next"))

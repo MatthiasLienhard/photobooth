@@ -195,10 +195,8 @@ class GUI_PyGame:
                     rgbimg.paste(image)
                     image=rgbimg
                     mode=image.mode
-
+                print('image mode='+str(mode))
                 data = image.tobytes()
-
-
                 image = pygame.image.fromstring(data, image.size, mode)
                 #image = pygame.image.frombuffer(image_buf, size, format="RGB")
             except pygame.error as msg:

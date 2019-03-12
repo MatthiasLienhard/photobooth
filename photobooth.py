@@ -41,10 +41,9 @@ class PhotoboothException(Exception):
 # Classes #
 ###########
 def open_images(filenames: [str]):
-    imgs = []
-    for fn in filenames:
-        imgs.append(Image.open(fn))
-    return (imgs)
+    return [Image.open(fn).convert('RGBA') for fn in filenames]
+
+
 
 
 class PictureList:
@@ -496,7 +495,8 @@ class MainPage(PhotobothPage):
 
     def set_example_img(self):
         self.example_img = self.pb.layout.assemble_pictures(self.example_img_raw * self.pb.layout.get_npic(),
-                                                            self.pb.theme, (600, 400))
+                                                            self.pb.theme, (600, 400)).convert('RGBA')
+
         self.example_img = self.example_img.rotate(10, expand=True)
 
     def toggle_filter(self):
